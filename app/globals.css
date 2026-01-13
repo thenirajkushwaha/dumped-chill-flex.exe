@@ -26,3 +26,7 @@ body {
   color: var(--foreground);
   font-family: 'Poppins', system-ui, sans-serif;
 }
+
+#header{
+  padding: 50px 0px;
+}
