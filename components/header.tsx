@@ -1,6 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import gsap from "gsap";
+import ScrollTrigger from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 type NavItem = {
   label: string;
@@ -24,26 +28,121 @@ export default function Header() {
   const navRight: NavItem[] = navItems.slice(0, 3);
   const navLeft: NavItem[] = navItems.slice(3, 6)
 
-  useEffect(() => {
-    const onScroll = () => {
-      const currentY = window.scrollY;
+  // useEffect(() => {
+  //   const onScroll = () => {
+  //     const currentY = window.scrollY;
 
-      // style change
-      setScrolled(currentY > 40);
+  //     // style change
+  //     setScrolled(currentY > 40);
 
-      // direction detection
-      if (currentY > lastScrollY && currentY > 80) {
-        setHidden(true); // scrolling down
-      } else {
-        setHidden(false); // scrolling up
-      }
+  //     // direction detection
+  //     if (currentY > lastScrollY && currentY > 80) {
+  //       setHidden(true); // scrolling down
+  //     } else {
+  //       setHidden(false); // scrolling up
+  //     }
 
-      setLastScrollY(currentY);
-    };
+  //     setLastScrollY(currentY);
+  //   };
 
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [lastScrollY]);
+  //   window.addEventListener("scroll", onScroll, { passive: true });
+  //   return () => window.removeEventListener("scroll", onScroll);
+  // }, [lastScrollY]);
+
+  const leftNavRef = useRef<HTMLDivElement>(null);
+  const rightNavRef = useRef<HTMLDivElement>(null);
+  const leftZoneRef = useRef<HTMLDivElement>(null);
+  const rightZoneRef = useRef<HTMLDivElement>(null);
+
+useEffect(() => {
+  const hero = document.querySelector("#hero");
+
+  let heroActive = false;
+  let activeSide: "left" | "right" | null = null;
+
+  // Initial state
+  gsap.set([leftNavRef.current, rightNavRef.current], {
+    opacity: 1,
+  });
+
+ScrollTrigger.create({
+  trigger: hero,
+  start: "top top",
+  end: "bottom top",
+  onEnter: () => {
+    heroActive = false;   // hero visible
+  },
+  onEnterBack: () => {
+    heroActive = false;   // hero visible again
+    show(rightNavRef.current)
+    show(leftNavRef.current)
+  },
+  onLeave: () => {
+    heroActive = true;  // hero gone
+    hideBoth();          // force hide
+  },
+});
+
+  // ===== MOUSE REGION DETECTION =====
+  const onMouseMove = (e: MouseEvent) => {
+    if (!heroActive) return;
+
+    const vw = window.innerWidth;
+    const x = e.clientX;
+    const threshold = vw * 0.15;
+
+    if (x < threshold && activeSide !== "left") {
+      activeSide = "left";
+      show(leftNavRef.current);
+      hide(rightNavRef.current);
+    } 
+    else if (x > vw - threshold && activeSide !== "right") {
+      activeSide = "right";
+      show(rightNavRef.current);
+      hide(leftNavRef.current);
+    } 
+    else if (x >= threshold && x <= vw - threshold && activeSide !== null) {
+      activeSide = null;
+      hideBoth();
+    }
+  };
+
+  window.addEventListener("mousemove", onMouseMove);
+
+  // ===== ANIMATIONS (opacity only) =====
+  function show(el: HTMLDivElement | null) {
+    if (!el) return;
+
+    gsap.to(el, {
+      opacity: 1,
+      duration: 0.35,
+      ease: "sine.out", // headlight
+      overwrite: "auto",
+    });
+  }
+
+  function hide(el: HTMLDivElement | null) {
+    if (!el) return;
+
+    gsap.to(el, {
+      opacity: 0,
+      duration: 0.25,
+      ease: "sine.in",
+      overwrite: "auto",
+    });
+  }
+
+  function hideBoth() {
+    hide(leftNavRef.current);
+    hide(rightNavRef.current);
+    activeSide = null;
+  }
+
+  return () => {
+    window.removeEventListener("mousemove", onMouseMove);
+    ScrollTrigger.getAll().forEach(t => t.kill());
+  };
+}, []);
 
   return (
     <header
@@ -79,7 +178,7 @@ export default function Header() {
           ))}
         </div>
 
-        <div className="flex flex-col absolute left-0 top-[44vh]">
+        <div  ref={leftNavRef} className="flex flex-col absolute left-0 z-40 pointer-events-auto top-[calc(50vh-42px)]">
           {
             navRight.map((el, i) => (
               <a
@@ -97,7 +196,7 @@ export default function Header() {
           }
         </div>
 
-        <div className="flex flex-col absolute right-0 top-[44vh]">
+        <div ref={rightNavRef} className="flex flex-col absolute z-40  right-0 top-[calc(50vh-42px)]">
           {
             navLeft.map((el, i) => (
               <a
@@ -115,7 +214,7 @@ export default function Header() {
           }
         </div>
 
-        <a className="absolute top-10 right-10" href="/booking">
+        <a id="book" className="absolute top-10 right-10 rounded-2xl" href="/booking">
           <span className="font-light text-xl underline hover:no-underline">
             book a service
           </span>

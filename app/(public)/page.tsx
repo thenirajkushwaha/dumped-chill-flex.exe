@@ -2,77 +2,246 @@
 
 import { supabase } from "@/lib/supabase/client";
 import { Service } from "@/lib/types/service";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import WhyChillThrive from "./components/WhyChillThrive";
 import CallToAction from "./components/CallToAction";
 import TestimonialsPreview from "./components/TestimonialsPreview";
 import FullPageLoader from "./components/FullPageLoader";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 export default function Home() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
 
 
-useEffect(() => {
-  const fetchRandomServices = async () => {
-    const { data, error } = await supabase
-      .from("services")
-      .select("id,title,description,media_url,media_type,yt_url")
-      .eq("is_active", true);
+  useEffect(() => {
+    const fetchRandomServices = async () => {
+      const { data, error } = await supabase
+        .from("services")
+        .select("id,title,description,media_url,media_type,yt_url")
+        .eq("is_active", true);
 
-    if (error || !data) return;
+      if (error || !data) return;
 
-    // shuffle client-side
-    const shuffled = [...data].sort(() => 0.5 - Math.random());
+      // shuffle client-side
+      const shuffled = [...data].sort(() => 0.5 - Math.random());
 
-    const normalized: Service[] = shuffled.slice(0, 4).map((s) => ({
-      id: s.id,
-      slug: "", // not needed here, keep empty or remove from interface if unused
-      title: s.title,
-      type: "single", // or infer if needed
+      const normalized: Service[] = shuffled.slice(0, 4).map((s) => ({
+        id: s.id,
+        slug: "", // not needed here, keep empty or remove from interface if unused
+        title: s.title,
+        type: "single", // or infer if needed
 
-      mediaUrl: s.media_url,        // ✅ FIX
-      mediaType: s.media_type,      // ✅ FIX
-      ytUrl: s.yt_url ?? undefined, // ✅ FIX
+        mediaUrl: s.media_url,        // ✅ FIX
+        mediaType: s.media_type,      // ✅ FIX
+        ytUrl: s.yt_url ?? undefined, // ✅ FIX
 
-      description: s.description,
+        description: s.description,
 
-      durationMinutes: [],
-      benefits: [],
+        durationMinutes: [],
+        benefits: [],
 
-      price: 0,
-      currency: "INR",
+        price: 0,
+        currency: "INR",
 
-      isActive: true,
-      createdAt: "",
-    }));
+        isActive: true,
+        createdAt: "",
+      }));
 
-    setServices(normalized);
+      setServices(normalized);
 
-    setTimeout(() => setLoading(false), 300);
-  };
+      setTimeout(() => setLoading(false), 300);
+    };
 
-  fetchRandomServices();
-}, []);
+    fetchRandomServices();
+  }, []);
+
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const el1Ref = useRef<HTMLDivElement>(null);
+  const el2Ref = useRef<HTMLDivElement>(null);
+  const el3Ref = useRef<HTMLDivElement>(null);
+
+  const container2Ref = useRef<HTMLDivElement>(null);
+  const el1C2Ref = useRef<HTMLDivElement>(null);
+  const el2C2Ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current || !el1Ref.current || !el2Ref.current) return;
+
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: containerRef.current,
+        start: "top top",
+        end: "+=175%",      // scroll distance controls timing
+        pin: true,          // 🔒 pinned screen
+        scrub: true,        // 🔗 scroll linked
+        anticipatePin: 1,
+      },
+    });
+
+    tl
+      // Element 1
+      .fromTo(
+        el1Ref.current,
+        { y: 20 },
+        {
+          y: 0,
+          duration: 0.05,
+          ease: "power2.out",
+        }
+      )
+      // .to(el1Ref.current, {
+      //   y: -60,             // moves up → creates space
+      //   duration: 0.6,
+      //   ease: "power2.out",
+      // })
+
+      // Element 2
+      .fromTo(
+        el2Ref.current,
+        { opacity: 0, y: 20 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.2,
+          ease: "power2.in",
+        }
+      )
+      // .to(el2Ref.current, {
+      //   y: -60,
+      //   duration: 0.6,
+      //   ease: "power2.out",
+      // });
+
+      .fromTo(
+        el3Ref.current,
+        { opacity: 0},
+        {
+          opacity: 1,
+          duration: 0.2,
+          ease: "power2.in",
+        }
+      )
+      // .fromTo(
+      //   "#book",
+      //   {scale: 1, color:"#000000", padding:"0px"},
+      //   {
+      //     color: "#289BD0", border:"1px solid black", padding:"5px",
+      //     duration: 0.2,
+      //     ease: "linear",
+      //   }
+      // )
+      // .to(
+      //   "#book",
+      //   {scale: 1, color:"#000000", border:"0px"},
+      // )
+      // .
+
+    return () => {
+      tl.scrollTrigger?.kill();
+      tl.kill();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!container2Ref.current || !el1C2Ref.current || !el2C2Ref.current) return;
+
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: container2Ref.current,
+        start: "top top",
+        end: "+=175%",      // scroll distance controls timing
+        pin: true,          // 🔒 pinned screen
+        scrub: true,        // 🔗 scroll linked
+        anticipatePin: 1,
+      },
+    });
+
+    tl
+      // Element 1
+      .fromTo(
+        el1C2Ref.current,
+        { opacity: 1 },
+        {
+          opacity: 0,
+          duration: 0.8,
+          ease: "power2.out",
+        }
+      )
+      // .to(el1Ref.current, {
+      //   y: -60,             // moves up → creates space
+      //   duration: 0.6,
+      //   ease: "power2.out",
+      // })
+
+      // Element 2
+      .fromTo(
+        el2C2Ref.current,
+        { opacity: 0 },
+        {
+          opacity: 1,
+          duration: 0.05,
+          ease: "power2.out",
+        }
+      )
+      // .to(el2Ref.current, {
+      //   y: -60,
+      //   duration: 0.6,
+      //   ease: "power2.out",
+      // });
+
+      .fromTo(
+        el3Ref.current,
+        { opacity: 0},
+        {
+          opacity: 1,
+          duration: 0.05,
+          ease: "power2.out",
+        }
+      )
+      // .fromTo(
+      //   "#book",
+      //   {scale: 1, color:"#000000", padding:"0px"},
+      //   {
+      //     color: "#289BD0", border:"1px solid black", padding:"5px",
+      //     duration: 0.2,
+      //     ease: "linear",
+      //   }
+      // )
+      // .to(
+      //   "#book",
+      //   {scale: 1, color:"#000000", border:"0px"},
+      // )
+      // .
+
+    return () => {
+      tl.scrollTrigger?.kill();
+      tl.kill();
+    };
+  }, []);
 
 
   return (
     <>
     <FullPageLoader visible={loading} />
-      <section className="font-sans">
-        <section className="h-screen flex justify-center">
+      <section id="hero" className="font-sans">
+        <section ref={containerRef} className="h-screen flex justify-center">
           <div className="flex items-center justify-center mx-auto">
-            {/* <img src="/image/icebathhero.png" alt="" className="h-80" /> */}
-            <div className="flex flex-col ml-5">
+            <img src="/image/icebathhero.png" alt="" className="absolute h-40 -z-10 opacity-50 top-18" />
+            <div className="flex flex-col ml-5 items-center">
               {/* <span className="text-[84px] leading-[80px]">Welcome to</span> */}
-              <div className="flex flex-row">
+              <div ref={el1Ref} className="flex flex-row">
                 <span className="text-[115px] leading-[100px] text-[#289BD0]">Chill&nbsp;</span>
                 <span className="text-[115px] leading-[100px] text-[#5DB4DB]">Thrive</span>
               </div>
-              {/* <span className="text-[28px] mt-3 font-[400]">Where <a href="" className="underline text-[#00FF48]">Recovery</a> Meets Resilience.</span> */}
-              {/* <span className="text-[22px] mt-9 font-[400]">Rejuvenate your body. <br />
-                    Reset your mind.</span> */}
+              <span ref={el2Ref} className="text-[28px] mt-3 font-[400]">Here <a href="" className="underline text-[#00FF48]">Recovery</a> Meets Resilience</span>
+              <span ref={el3Ref} className="absolute top-[calc(64vh)] text-center text-[22px] mt-9 font-[400]">Rejuvenate your body <br />
+                    Reset your mind</span>
             </div>
           </div>
 
@@ -80,45 +249,42 @@ useEffect(() => {
             <a className="rounded-2xl underline hover:no-underline" href="/booking">Book</a>&nbsp;a session right now
           </div> */}
         </section>
-        <section className="w-[1080px] mx-auto">
+        
+        <section ref={container2Ref} className=" min-h-screen mx-auto relative">
           <br />
-          <div>
-            <div className="my-12 flex text-[84px] mb-10">
-              <a className="underline hover:no-underline rounded-2xl" href="/services">Explore Services</a>
+            <div ref={el1C2Ref} className="text-black my-12 flex text-[92px] font-[500] justify-center mb-10 absolute left-[calc(50vw-290px)] top-[calc(48vh-110px)]">
+              <a className="rounded-2xl" href="/services">Our Services</a>
             </div>
 
-            <div className="flex justify-center flex-wrap gap-20">
+            <div ref={el2C2Ref} className="flex items-center justify-center flex-wrap gap-15 w-[1080px] mx-auto h-screen">
               {services.map((s, i) => (
-                <div className="bg-[#F9F9F9] p-8 w-[372px]" key={s.id ?? i}>
+                <div className="bg-[#F9F9F9] p-4 w-[312px] h-fit flex flex-col items-start" key={s.id ?? i}>
                   <img
-                    className="w-80 h-80 rounded-3xl object-cover"
+                    className="w-full  rounded-3xl object-cover"
                     src={s.mediaUrl || "/image/blankimage.png"}
                     alt={s.title}
                   />
 
-                  <div>
-                    <div className="flex flex-rol w-full justify-between mt-8 mb-2">
-                      <span className="text-3xl font-semibold">
+                    <div className="flex flex-rol w-full justify-between items-end mt-4 mb-2">
+                      <span className="text-2xl font-semibold">
                         {s.title}
                       </span>
 
                       <a href="/services">
                         <img
-                          className="bg-[#289BD0] h-10 w-10 p-2.25 rounded-2xl"
+                          className="bg-[#289BD0] h-7 w-7 p-2.25 rounded-lg"
                           src="/image/arrow01.svg"
                           alt="View service"
                         />
                       </a>
                     </div>
 
-                    <span className="line-clamp-3">
+                    <span className="line-clamp-3 text-sm">
                       {s.description}
                     </span>
                   </div>
-                </div>
               ))}
             </div>
-          </div>
         </section>
         <WhyChillThrive />
         <TestimonialsPreview />
