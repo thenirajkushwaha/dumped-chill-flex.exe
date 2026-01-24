@@ -26,20 +26,28 @@ export default async function FounderPage() {
     <div className="bg-[#FFFFFF] min-h-screen font-sans text-black">
       {/* ---------- HERO SECTION ---------- */}
       <section className="pt-24 pb-16 px-6">
-        <div className="max-w-[1080px] mx-auto text-center space-y-8">
-          <div className="relative inline-block">
-            <div className="absolute inset-0 bg-[#289BD0] rounded-full blur-2xl opacity-10 animate-pulse"></div>
-            <img
-              src={founder.photo_url}
-              alt={founder.founder_name}
-              className="relative mx-auto w-48 h-48 rounded-full object-cover border-4 border-white shadow-xl"
-            />
-          </div>
-          <div className="space-y-2">
+        <div className="flex justify-center mb-25">
             <h1 className="text-6xl font-bold tracking-tight">
               <span className="text-[#289BD0]">The</span> Founder
             </h1>
-            <p className="text-2xl text-gray-500 font-light">{founder.founder_name}</p>
+        </div>
+
+        <div className="max-w-[1080px] mx-auto text-center space-y-8 flex flex-col justify-center gap-0">
+          <div className="relative inline-block">
+            <div className=""></div>
+            <img
+              src={founder.photo_url}
+              alt={founder.founder_name}
+              className="relative mx-auto w-100 h-150 object-cover"
+            />
+          </div>
+          <div className="space-y-2">
+            {/* <h1 className="text-6xl font-bold tracking-tight">
+              <span className="text-[#289BD0]">The</span> Founder
+            </h1> */}
+            <p className="text-5xl font-light ">{founder.founder_name}</p>
+
+            
           </div>
         </div>
       </section>

@@ -8,6 +8,8 @@ import {
 import { supabase } from '@/lib/supabase/client';
 import Link from 'next/link';
 
+import { logoutAction } from '@/app/actions/auth'; // Ensure this path is correct
+
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
@@ -72,11 +74,16 @@ export default function AdminDashboard() {
             Welcome back, Chief. <span className="w-1 h-1 bg-slate-300 rounded-full"/> {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
           </p>
         </div>
-
-        <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-red-600 font-bold rounded-xl hover:bg-red-50 transition-all shadow-sm">
-          <LogOut size={18} />
-          Logout
-        </button>
+{/* Updated Logout Form */}
+<form action={logoutAction}>
+          <button 
+            type="submit"
+            className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-red-600 font-bold rounded-xl hover:bg-red-50 transition-all shadow-sm active:scale-95"
+          >
+            <LogOut size={18} />
+            Logout
+          </button>
+        </form>
       </header>
 
       {/* Primary Metrics Grid */}

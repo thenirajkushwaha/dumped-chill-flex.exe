@@ -49,7 +49,7 @@ export default function AdminLoginPage() {
           disabled={loading}
           className="w-full bg-black text-white py-2 rounded"
         >
-          {loading ? "Sending Login Link..." : "Send OTP"}
+          {loading ? "Sending Login Link..." : "Send Link"}
         </button>
       </form>
 
