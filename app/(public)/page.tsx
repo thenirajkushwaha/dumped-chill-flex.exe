@@ -201,7 +201,7 @@ export default function Home() {
         {
           opacity: 0,
           duration: 0.5,
-          ease: "power2.out",
+          ease: "sine",
         }
       )
       // .to(el1Ref.current, {
@@ -282,7 +282,7 @@ export default function Home() {
           { opacity: 0 },
           {
             opacity: 1,
-            duration: 0.8,
+            duration: 0.4,
             ease: "power2.out",
           }
         )
@@ -290,7 +290,7 @@ export default function Home() {
         // Element 2
         .fromTo(
           el2WhyRef.current,
-          { x:"100vw" },
+          { x:"0vw" },
           {
             x:"-230vw",
             duration: 1.5,
