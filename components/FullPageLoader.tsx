@@ -41,6 +41,7 @@ export default function FullPageLoader({ visible }: Props) {
       <img
         src="/animation-elements/loadingScreen.svg"
         alt="Loading"
+        className="pulse-loading"
       />
     </div>
   );

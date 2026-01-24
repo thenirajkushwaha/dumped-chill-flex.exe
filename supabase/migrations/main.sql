@@ -42,6 +42,19 @@ CREATE TABLE services (
 ALTER TABLE services
 ADD COLUMN yt_url TEXT;
 
+UPDATE services
+SET slug = lower(replace(title, ' ', '-'))
+WHERE slug IS NULL;
+
+ALTER TABLE services
+ADD COLUMN sort_order INTEGER DEFAULT 0;
+
+UPDATE services
+SET sort_order = EXTRACT(EPOCH FROM created_at)::int;
+
+ALTER TABLE services
+ADD COLUMN capacity INTEGER NOT NULL DEFAULT 1;
+
 
 CREATE TABLE bookings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -62,13 +75,6 @@ CREATE TABLE bookings (
 );
 
 ALTER TABLE bookings
-ADD COLUMN duration_minutes INTEGER NOT NULL;
-
-ALTER TABLE bookings
-ADD COLUMN slot_id UUID NOT NULL,
-ADD COLUMN duration_minutes INTEGER NOT NULL;
-
-ALTER TABLE bookings
 DROP COLUMN booking_time;
 
 ALTER TABLE bookings
@@ -76,6 +82,34 @@ ADD CONSTRAINT bookings_slot_fk
 FOREIGN KEY (slot_id)
 REFERENCES slot_timings(id)
 ON DELETE RESTRICT;
+
+ALTER TABLE bookings
+DROP COLUMN IF EXISTS duration_minutes;
+
+ALTER TABLE bookings
+ADD COLUMN duration_minutes INTEGER NOT NULL;
+
+ALTER TABLE bookings
+ADD COLUMN status TEXT
+CHECK (status IN ('confirmed', 'pending', 'cancelled'))
+DEFAULT 'pending';
+
+ALTER TABLE bookings
+ADD COLUMN amount NUMERIC(10,2) NOT NULL DEFAULT 0;
+
+CREATE TABLE schedule_exceptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  exception_date DATE NOT NULL,
+  slot_id UUID REFERENCES slot_timings(id) ON DELETE CASCADE,
+  service_id UUID REFERENCES services(id) ON DELETE CASCADE,
+
+  is_blocked BOOLEAN DEFAULT FALSE,
+  is_added BOOLEAN DEFAULT FALSE,
+
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
 
 CREATE TABLE slot_timings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -114,23 +148,28 @@ CREATE TABLE coupons (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE coupons (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-- 1. Add description
+ALTER TABLE coupons
+ADD COLUMN description TEXT;
 
-  code TEXT UNIQUE NOT NULL,               -- e.g. NEWUSER50
-  discount_amount NUMERIC(10,2) NOT NULL,  -- flat discount in INR
+-- 2. Add discount type (percent | fixed)
+ALTER TABLE coupons
+ADD COLUMN discount_type TEXT
+CHECK (discount_type IN ('percent','fixed'))
+NOT NULL DEFAULT 'fixed';
 
-  is_active BOOLEAN DEFAULT TRUE,
+-- 3. Rename valid_from / valid_until to TIMESTAMP (keep names)
+ALTER TABLE coupons
+ALTER COLUMN valid_from TYPE TIMESTAMP USING valid_from::timestamp,
+ALTER COLUMN valid_until TYPE TIMESTAMP USING valid_until::timestamp;
 
-  -- optional future-proofing
-  max_uses INTEGER,                        -- NULL = unlimited
-  used_count INTEGER DEFAULT 0,
+-- 4. Add auto-apply flag
+ALTER TABLE coupons
+ADD COLUMN is_auto_apply BOOLEAN DEFAULT FALSE;
 
-  valid_from DATE,
-  valid_until DATE,
-
-  created_at TIMESTAMP DEFAULT NOW()
-);
+-- 5. Add applicable services (UUID array)
+ALTER TABLE coupons
+ADD COLUMN applicable_services UUID[];
 
 create table testimonials (
   id uuid primary key default gen_random_uuid(),

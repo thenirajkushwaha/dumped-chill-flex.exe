@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import ScrollTrigger from "gsap/ScrollTrigger";
+import Link from "next/link";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -16,13 +17,21 @@ export default function Header() {
   const [hidden, setHidden] = useState(false);
   const [lastScrollY, setLastScrollY] = useState(0);
 
+  // const navItems: NavItem[] = [
+  //   { label: "services", href: "/services" },
+  //   { label: "awareness", href: "/awareness" },
+  //   { label: "events", href: "/events" },
+  //   { label: "founder", href: "/about" },
+  //   { label: "contact us", href: "/contact" },
+  //   { label: "testimonials", href: "/testimonials" },
+  // ];
   const navItems: NavItem[] = [
-    { label: "services", href: "/services" },
-    { label: "awareness", href: "/awareness" },
-    { label: "events", href: "/events" },
-    { label: "about us", href: "/about" },
-    { label: "contact us", href: "/contact" },
-    { label: "testimonials", href: "/testimonials" },
+    { label: "Services", href: "/services" },
+    { label: "Awareness", href: "/awareness" },
+    { label: "Events", href: "/events" },
+    { label: "Founder", href: "/about" },
+    { label: "Contact Us", href: "/contact" },
+    { label: "Testimonials", href: "/testimonials" },
   ];
 
   const navRight: NavItem[] = navItems.slice(0, 3);
@@ -154,17 +163,17 @@ ScrollTrigger.create({
         className={`
         `}
       >
-        <a href="/" className="absolute top-10 left-10">
+        <Link href="/" className="absolute top-10 left-10">
           <img
             src="/image/chillthrive-logo.png"
             alt="Chill Thrive Logo"
             className={`w-25`}
           />
-        </a>
+        </Link>
         
         <div className="md:hidden">
           {navItems.map((el, i) => (
-            <a
+            <Link
               key={i}
               href={el.href}
               className={`
@@ -174,24 +183,24 @@ ScrollTrigger.create({
               `}
             >
               {el.label}
-            </a>
+            </Link>
           ))}
         </div>
 
         <div  ref={leftNavRef} className="flex flex-col absolute left-0 z-40 pointer-events-auto top-[calc(50vh-42px)]">
           {
             navRight.map((el, i) => (
-              <a
-              key={i}
+              <Link
+              key={el.href}
               href={el.href}
               className={`
-                ml-10 text-xl font-light transition-colors
+                ml-10 text-xl font-light transition-colors mb-2
                 ${scrolled ? "text-gray-800" : "text-gray-600"}
                 hover:text-[#289BD0]
               `}
             >
               {el.label}
-            </a>
+            </Link>
             ))
           }
         </div>
@@ -199,26 +208,26 @@ ScrollTrigger.create({
         <div ref={rightNavRef} className="flex flex-col absolute z-40  right-0 top-[calc(50vh-42px)]">
           {
             navLeft.map((el, i) => (
-              <a
-              key={i}
+              <Link
+              key={el.href}
               href={el.href}
               className={`
-                mr-10 text-xl font-light transition-colors text-end
+                mr-10 text-xl font-light transition-colors text-end mb-2
                 ${scrolled ? "text-gray-800" : "text-gray-600"}
                 hover:text-[#289BD0]
               `}
             >
               {el.label}
-            </a>
+            </Link>
             ))
           }
         </div>
 
-        <a id="book" className="absolute top-10 right-10 rounded-2xl" href="/booking">
+        <Link id="book" className="absolute top-10 right-10 rounded-2xl" href="/booking">
           <span className="font-light text-xl underline hover:no-underline">
             book a service
           </span>
-        </a>
+        </Link>
       </div>
     </header>
   );

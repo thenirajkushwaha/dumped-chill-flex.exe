@@ -7,7 +7,7 @@ export default function CallToAction() {
   const router = useRouter();
 
   return (
-    <section className="h-screen flex align-center justify-center py-20">
+    <section className="h-screen flex items-center justify-center py-20">
       <div className="border rounded-xl bg-white px-30 py-40 text-center space-y-6 h-fit">
         <h2 className="text-3xl font-light">
           Start Your Recovery Journey Today

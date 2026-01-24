@@ -27,7 +27,7 @@ export default function AdminLoginPage() {
       return;
     }
 
-    setMessage("OTP sent. Check your email.");
+    setMessage("Login Link sent. Check your email.");
   }
 
   return (
@@ -49,7 +49,7 @@ export default function AdminLoginPage() {
           disabled={loading}
           className="w-full bg-black text-white py-2 rounded"
         >
-          {loading ? "Sending OTP..." : "Send OTP"}
+          {loading ? "Sending Login Link..." : "Send OTP"}
         </button>
       </form>
 

@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import WhyChillThrive from "./components/WhyChillThrive";
 import CallToAction from "./components/CallToAction";
 import TestimonialsPreview from "./components/TestimonialsPreview";
-import FullPageLoader from "./components/FullPageLoader";
+import FullPageLoader from "../../components/FullPageLoader";
 import {
   Card,
   CardHeader,

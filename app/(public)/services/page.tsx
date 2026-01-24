@@ -7,7 +7,7 @@ import { supabase } from "../../../lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ServiceCardSkeleton } from "./components/ServiceCardSkeleton";
 
-import FullPageLoader from "../components/FullPageLoader";
+import FullPageLoader from "../../../components/FullPageLoader";
 
 export default function Services() {
   const router = useRouter();

@@ -7,89 +7,106 @@ export const metadata = {
 };
 
 export default async function FounderPage() {
+  // Fetching from Supabase - matching the schema provided
   const { data: founder } = await supabase
     .from("founder_content")
     .select("*")
-    .eq("is_active", true)
+    .limit(1)
     .single();
 
-  if (!founder) return null;
+  if (!founder) {
+    return (
+      <div className="h-screen flex items-center justify-center text-gray-400">
+        Content coming soon...
+      </div>
+    );
+  }
 
   return (
-    <div className="md:w-[760px] mx-auto py-16 space-y-16">
-      {/* ---------- HEADER ---------- */}
-      <header className="text-center space-y-4">
-        <img
-          src={founder.photo_url}
-          alt={founder.founder_name}
-          className="mx-auto w-40 h-40 rounded-full object-cover"
-        />
-        <h1 className="text-3xl font-bold">
-          {founder.founder_name}
-        </h1>
-      </header>
-
-      {/* ---------- FOUNDER STORY ---------- */}
-      <section className="space-y-6">
-        <h2 className="text-2xl font-semibold">Founder Story</h2>
-
-        <Card className="bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle>Journey</CardTitle>
-          </CardHeader>
-          <CardContent className="text-gray-600">
-            {founder.story_journey}
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle>Vision</CardTitle>
-          </CardHeader>
-          <CardContent className="text-gray-600">
-            {founder.story_vision}
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle>Why Chill Thrive</CardTitle>
-          </CardHeader>
-          <CardContent className="text-gray-600">
-            {founder.story_why}
-          </CardContent>
-        </Card>
+    <div className="bg-[#FFFFFF] min-h-screen font-sans text-black">
+      {/* ---------- HERO SECTION ---------- */}
+      <section className="pt-24 pb-16 px-6">
+        <div className="max-w-[1080px] mx-auto text-center space-y-8">
+          <div className="relative inline-block">
+            <div className="absolute inset-0 bg-[#289BD0] rounded-full blur-2xl opacity-10 animate-pulse"></div>
+            <img
+              src={founder.photo_url}
+              alt={founder.founder_name}
+              className="relative mx-auto w-48 h-48 rounded-full object-cover border-4 border-white shadow-xl"
+            />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-6xl font-bold tracking-tight">
+              <span className="text-[#289BD0]">The</span> Founder
+            </h1>
+            <p className="text-2xl text-gray-500 font-light">{founder.founder_name}</p>
+          </div>
+        </div>
       </section>
 
-      {/* ---------- MISSION & VALUES ---------- */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <Card className="bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle>Mission</CardTitle>
-          </CardHeader>
-          <CardContent className="text-gray-600">
-            {founder.mission}
-          </CardContent>
-        </Card>
+      <div className="max-w-[800px] mx-auto px-6 space-y-20 pb-24">
+        {/* ---------- MISSION & VALUES (GRID) ---------- */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <Card className="bg-[#F9F9F9] border-none shadow-none rounded-3xl p-4">
+            <CardHeader>
+              <CardTitle className="text-[#289BD0] text-3xl">Mission</CardTitle>
+            </CardHeader>
+            <CardContent className="text-gray-700 leading-relaxed">
+              {founder.mission}
+            </CardContent>
+          </Card>
 
-        <Card className="bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle>Values</CardTitle>
-          </CardHeader>
-          <CardContent className="text-gray-600">
-            {founder.values}
-          </CardContent>
-        </Card>
-      </section>
+          <Card className="bg-[#F9F9F9] border-none shadow-none rounded-3xl p-4">
+            <CardHeader>
+              <CardTitle className="text-[#5DB4DB] text-3xl">Values</CardTitle>
+            </CardHeader>
+            <CardContent className="text-gray-700 leading-relaxed">
+              {founder.values}
+            </CardContent>
+          </Card>
+        </section>
 
-      {/* ---------- QUOTE ---------- */}
-      <section>
-        <Card className="bg-white shadow-sm border-l-4 border-black">
-          <CardContent className="italic text-lg text-gray-700 py-8">
-            “{founder.quote}”
-          </CardContent>
-        </Card>
-      </section>
+        {/* ---------- FOUNDER STORY (STAGGERED) ---------- */}
+        <section className="space-y-12">
+          <div className="space-y-4">
+            <h2 className="text-4xl font-semibold border-l-4 border-[#289BD0] pl-6">
+              Our Journey
+            </h2>
+            <p className="text-lg text-gray-600 leading-loose italic">
+              {founder.story_journey}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-8">
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold uppercase tracking-widest text-gray-400">The Vision</h3>
+              <p className="text-gray-700 leading-relaxed">{founder.story_vision}</p>
+            </div>
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold uppercase tracking-widest text-gray-400">Why We Exist</h3>
+              <p className="text-gray-700 leading-relaxed">{founder.story_why}</p>
+            </div>
+          </div>
+        </section>
+
+        {/* ---------- SIGNATURE QUOTE ---------- */}
+        <section className="pt-10">
+          <div className="relative p-12 text-center bg-black rounded-[40px] overflow-hidden">
+            {/* Background Accent */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#289BD0] opacity-20 blur-3xl"></div>
+            
+            <span className="text-6xl text-[#289BD0] font-serif absolute top-6 left-10 opacity-50">“</span>
+            <blockquote className="relative z-10 text-2xl md:text-3xl text-white font-light leading-snug">
+              {founder.quote}
+            </blockquote>
+            <span className="text-6xl text-[#289BD0] font-serif absolute bottom-0 right-10 opacity-50">”</span>
+            
+            <p className="mt-8 text-[#5DB4DB] font-medium tracking-widest uppercase text-sm">
+              — {founder.founder_name}
+            </p>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
