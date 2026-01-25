@@ -1,59 +1,69 @@
-// src/middleware.ts
-import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
-  const pathname = req.nextUrl.pathname;
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () => req.cookies.getAll(),
-        setAll: (cookies) => {
-          cookies.forEach(({ name, value, options }) => {
-            res.cookies.set(name, value, options);
-          });
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
         },
       },
     }
-  );
+  )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // This is the critical line: getUser() refreshes the session if it's expired
+  const { data: { user } } = await supabase.auth.getUser()
 
-  /* 1️⃣ /admin → /admin/dashboard */
-if (
-  pathname === "/admin" ||
-  pathname === "/admin/"
-) {
-  return NextResponse.redirect(
-    new URL("/admin/dashboard", req.url)
-  );
-}
+  const url = request.nextUrl.clone()
+  const pathname = url.pathname
 
-  const isLoginRoute = pathname.startsWith("/admin/login");
-
-  /* 2️⃣ logged-in user should never see login */
-  if (user && isLoginRoute) {
-    return NextResponse.redirect(
-      new URL("/admin/dashboard", req.url)
-    );
+  // 1. Handle base /admin path
+  if (pathname === '/admin' || pathname === '/admin/') {
+    url.pathname = '/admin/dashboard'
+    return NextResponse.redirect(url)
   }
 
-  /* 3️⃣ protect admin routes */
-  if (!user && !isLoginRoute) {
-    return NextResponse.redirect(
-      new URL("/admin/login", req.url)
-    );
+  // 2. Redirect logged-in users away from login page
+  if (user && pathname.startsWith('/admin/login')) {
+    url.pathname = '/admin/dashboard'
+    return NextResponse.redirect(url)
   }
 
-  return res;
+  // 3. Protect admin routes from unauthenticated users
+  if (!user && !pathname.startsWith('/admin/login')) {
+    url.pathname = '/admin/login'
+    return NextResponse.redirect(url)
+  }
+
+  return response
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
-};
+  matcher: [
+    /*
+     * Match all request paths starting with /admin
+     * but exclude static files (images, favicon, etc.)
+     */
+    '/admin/:path*',
+  ],
+}

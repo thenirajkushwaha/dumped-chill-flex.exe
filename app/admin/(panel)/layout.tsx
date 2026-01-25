@@ -10,15 +10,17 @@ export default async function AdminLayout({
   const supabase = await createSupabaseServer();
   const { data } = await supabase.auth.getUser();
 
-  // Basic security check
   if (!data.user) {
     redirect("/admin/login");
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row">
       <AdminSidebar />
-      <main className="flex-1 ml-64 min-w-0 overflow-hidden">
+      {/* ml-0 on mobile, ml-64 on desktop. 
+          pt-16 on mobile to account for the fixed Top Bar. 
+      */}
+      <main className="flex-1 transition-all duration-300 lg:ml-64 pt-16 lg:pt-0 min-w-0 overflow-hidden">
         <div className="h-full w-full">
           {children}
         </div>
