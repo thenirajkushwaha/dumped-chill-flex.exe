@@ -1,3 +1,35 @@
+# Chill Thrive - Recovery & Wellness Platform
+
+A comprehensive Next.js application for Chill Thrive, a recovery and wellness center offering ice bath sessions, cold therapy, and community-driven wellness programs. This platform includes both a public-facing client frontend and an administrative panel for managing services, bookings, content, and operations.
+
+## 🚀 Technology Stack
+
+- **Framework**: Next.js 16.1.1 (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS 4
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth
+- **Payment Gateway**: Razorpay
+- **Email Service**: Nodemailer (Gmail)
+- **Animation**: GSAP (GreenSock Animation Platform)
+- **UI Components**: Radix UI, shadcn/ui
+- **Charts**: Recharts
+
+## 📁 Project Structure
+
+```
+├── app/
+│   ├── (public)/          # Public-facing pages
+│   ├── admin/             # Admin panel pages
+│   ├── api/               # Backend API routes
+│   └── actions/           # Server actions
+├── components/            # Reusable UI components
+├── lib/                   # Utilities and configurations
+│   ├── supabase/         # Supabase client/server setup
+│   ├── types/            # TypeScript type definitions
+│   └── admin/            # Admin utilities
+└── public/               # Static assets
+```
 
 ---
 
@@ -345,7 +377,8 @@
 - Sends confirmation email via Nodemailer
 - Returns booking ID on success
 
-**Request Body**:t
+**Request Body**:
+```typescript
 {
   service: { id, title },
   date: string,
@@ -357,3 +390,356 @@
   form: { name, phone, email, payment },
   paymentDetails?: { razorpay_payment_id, ... }
 }
+```
+
+### 2. **Slots API** (`/api/slots`)
+**Location**: `app/api/slots/route.tsx`
+
+**Method**: GET
+
+**Functionality**:
+- Fetches available time slots for a given date
+- Uses Supabase RPC function `get_available_slots`
+- Checks blocked dates
+- Calculates remaining capacity per slot
+- Returns empty array if date is blocked
+
+**Query Parameters**:
+- `date`: ISO date string (YYYY-MM-DD)
+
+**Response**:
+```typescript
+{
+  slots: Array<{
+    slot_id: string,
+    start_time: string,
+    end_time: string,
+    remaining_capacity: number
+  }>
+}
+```
+
+### 3. **Coupon API** (`/api/coupon`)
+**Location**: `app/api/coupon/route.ts`
+
+**Method**: POST
+
+**Functionality**:
+- Validates coupon codes
+- Checks coupon active status
+- Returns discount amount if valid
+- Returns validation result
+
+**Request Body**:
+```typescript
+{
+  code: string,
+  serviceId?: string,
+  duration?: number
+}
+```
+
+**Response**:
+```typescript
+{
+  valid: boolean,
+  discountAmount?: number
+}
+```
+
+### 4. **Admin Authentication APIs**
+**Location**: `app/api/admin/login/route.ts` & `register/route.ts`
+
+**Functionality**:
+- Admin user authentication
+- Registration with admin privileges
+- Session management
+
+### 5. **Admin Dashboard API** (`/api/admin/dashboard`)
+**Location**: `app/api/admin/dashboard/route.ts`
+
+**Functionality**:
+- Aggregates dashboard metrics
+- Booking statistics
+- Revenue calculations
+
+### 6. **Booking Verification API** (`/api/booking/verify`)
+**Location**: `app/api/booking/verify/route.ts`
+
+**Functionality**:
+- Verifies booking status
+- Payment verification
+
+---
+
+## 🔗 Frontend-Backend Connection
+
+### Architecture Overview
+
+The application uses a **hybrid architecture** combining:
+1. **Client-side Supabase queries** (direct database access)
+2. **Next.js API routes** (server-side processing)
+3. **Server actions** (form handling)
+
+### Connection Patterns
+
+#### 1. **Direct Supabase Client Connection**
+**Used in**: Most frontend pages for data fetching
+
+**Example**: Services page, Testimonials page
+```typescript
+// Client-side direct query
+const { data } = await supabase
+  .from("services")
+  .select("*")
+  .eq("is_active", true);
+```
+
+**Advantages**:
+- Real-time updates
+- Fast data fetching
+- Automatic caching
+- Row-level security support
+
+**Used For**:
+- Reading public data (services, testimonials, events)
+- Admin panel data fetching
+- Real-time updates
+
+#### 2. **API Route Pattern**
+**Used in**: Booking flow, payment processing, coupon validation
+
+**Example**: Booking submission
+```typescript
+// Frontend calls API route
+const res = await fetch("/api/booking", {
+  method: "POST",
+  body: JSON.stringify(bookingData)
+});
+```
+
+**Advantages**:
+- Server-side validation
+- Secure payment processing
+- Email sending
+- Complex business logic
+
+**Used For**:
+- Creating bookings
+- Payment processing
+- Coupon validation
+- Email notifications
+
+#### 3. **Server Actions Pattern**
+**Used in**: Form submissions, authentication
+
+**Example**: Admin logout
+```typescript
+// Server action
+export async function logoutAction() {
+  const supabase = await createSupabaseServer();
+  await supabase.auth.signOut();
+  redirect("/admin/login");
+}
+```
+
+**Used For**:
+- Authentication flows
+- Form submissions
+- Server-side mutations
+
+### Data Flow Examples
+
+#### **Booking Flow**:
+```
+1. User selects service (Frontend → Supabase: Fetch services)
+2. User selects date/time (Frontend → API: /api/slots?date=...)
+3. User applies coupon (Frontend → API: /api/coupon)
+4. User submits booking (Frontend → API: /api/booking)
+   ↓
+5. API creates booking in Supabase
+6. API processes payment (if QR)
+7. API sends confirmation email
+8. API returns booking ID
+```
+
+#### **Admin Services Management**:
+```
+1. Admin views services (Frontend → Supabase: Direct query)
+2. Admin edits service (Frontend → Supabase: Direct update)
+3. Admin uploads media (Frontend → Supabase Storage: Direct upload)
+4. Changes reflect immediately (Supabase real-time)
+```
+
+#### **Content Management**:
+```
+1. Admin edits content (Frontend → Supabase: Direct upsert)
+2. Content saved to database
+3. Public pages fetch updated content (Frontend → Supabase: Direct query)
+4. Real-time content updates
+```
+
+### Authentication Flow
+
+#### **Public Pages**:
+- No authentication required
+- Direct Supabase queries with anonymous key
+- Row-level security policies control access
+
+#### **Admin Pages**:
+- Protected by middleware (`src/middleware.ts`)
+- Server-side authentication check
+- Redirects to `/admin/login` if not authenticated
+- Uses Supabase server client for secure operations
+
+### Environment Variables
+
+**Required Environment Variables**:
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Email (Nodemailer)
+GMAIL_USER=your_email@gmail.com
+GMAIL_APP_PASSWORD=your_app_password
+
+# Payment Gateway
+NEXT_PUBLIC_RAZORPAY_KEY_ID=your_razorpay_key
+```
+
+### Database Schema (Key Tables)
+
+- `services`: Service catalog with pricing tiers
+- `bookings`: Customer bookings with status tracking
+- `slot_timings`: Available time slots
+- `blocked_dates`: Dates when booking is unavailable
+- `coupons`: Discount codes and promotions
+- `testimonials`: Customer reviews (text/video)
+- `gallery_events`: Event galleries
+- `gallery_images`: Event images
+- `awareness`: Educational content sections
+- `founder_content`: Founder profile information
+- `inquiries`: Contact form submissions
+- `payments`: Payment transaction records
+- `admins`: Admin user accounts
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+ 
+- npm/pnpm/yarn
+- Supabase account and project
+- Razorpay account (for payments)
+- Gmail account with App Password (for emails)
+
+### Installation
+
+1. **Clone the repository**
+```bash
+git clone <repository-url>
+cd dumped-chill-flex.exe-main
+```
+
+2. **Install dependencies**
+```bash
+npm install
+# or
+pnpm install
+```
+
+3. **Set up environment variables**
+Create a `.env.local` file:
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+GMAIL_USER=your_email@gmail.com
+GMAIL_APP_PASSWORD=your_app_password
+NEXT_PUBLIC_RAZORPAY_KEY_ID=your_razorpay_key
+```
+
+4. **Run database migrations**
+Set up your Supabase database using the migration files in `supabase/migrations/`
+
+5. **Start development server**
+```bash
+npm run dev
+# or
+pnpm dev
+```
+
+6. **Access the application**
+- Frontend: `http://localhost:3000`
+- Admin Panel: `http://localhost:3000/admin/login`
+
+---
+
+## 📝 Key Features Summary
+
+### Frontend Features
+✅ Responsive design (mobile-first)
+✅ GSAP scroll animations
+✅ Service catalog with dynamic pricing
+✅ Multi-step booking flow
+✅ Payment integration (Razorpay)
+✅ Coupon/discount system
+✅ Video testimonial support
+✅ Event gallery management
+✅ Educational awareness content
+✅ Contact form with validation
+
+### Admin Features
+✅ Comprehensive dashboard with metrics
+✅ Service CRUD operations
+✅ Booking management and status updates
+✅ Content management (testimonials, gallery, founder, awareness)
+✅ Schedule and slot management
+✅ Coupon/promo management
+✅ Analytics and reporting
+✅ Media upload and management
+
+### Backend Features
+✅ Supabase database integration
+✅ Real-time data updates
+✅ Secure authentication
+✅ Payment processing
+✅ Email notifications
+✅ API route handlers
+✅ Server-side validation
+
+---
+
+## 🛠️ Development
+
+### Project Scripts
+```bash
+npm run dev      # Start development server
+npm run build    # Build for production
+npm run start    # Start production server
+npm run lint     # Run ESLint
+```
+
+### Tech Stack Details
+- **Next.js App Router**: File-based routing with server components
+- **TypeScript**: Type-safe development
+- **Tailwind CSS**: Utility-first styling
+- **Supabase**: Backend-as-a-Service (Database, Auth, Storage)
+- **GSAP**: Advanced animations and scroll effects
+- **Razorpay**: Payment gateway integration
+- **Nodemailer**: Email service
+
+---
+
+## 📄 License
+
+Private project - All rights reserved
+
+---
+
+## 👥 Support
+
+For questions or issues, contact: hello@chillthrive.in
