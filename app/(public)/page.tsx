@@ -427,37 +427,56 @@ export default function Home() {
   useEffect(() => {
     if (!containerWhyRef.current || !el1WhyRef.current || !el2WhyRef.current) return;
 
-    const mdBreakpoint = window.matchMedia('(min-width: 768px)');
+    // 1. Ensure the title is hidden immediately before animation starts to prevent "early" flash
+    gsap.set(el1WhyRef.current, { opacity: 0 });
 
     const tl = gsap.timeline({
       scrollTrigger: {
         trigger: containerWhyRef.current,
         start: "top top",
-        end: "+=300%",
+        // Increased end range slightly for smoother mobile scrolling
+        end: "+=350%", 
         pin: true,
-        scrub: true,
+        scrub: 1, // Added a slight smoothing value
+        invalidateOnRefresh: true, // Crucial for mobile orientation/resize
       },
     });
 
+    // 2. Dynamic calculation of scroll distance
+    // This calculates exactly how wide the card tray is
+    const getScrollAmount = () => {
+      const scrollWidth = el2WhyRef.current?.offsetWidth || 0;
+      const windowWidth = window.innerWidth;
+      // We move it from its starting position (100vw) until it's completely off-screen left
+      return -(scrollWidth + windowWidth);
+    };
+
     tl
+      // A. Fade in the title (Starts slightly after the pin begins to feel less abrupt)
       .fromTo(
         el1WhyRef.current,
-        { opacity: 0 },
+        { opacity: 0, y: 20 },
         {
           opacity: 1,
-          duration: 0.4,
+          y: 0,
+          duration: 0.5,
           ease: "power2.out",
         }
       )
+      // B. Small pause to let the user read the title
+      .to({}, { duration: 0.2 })
+      // C. Move the cards
       .fromTo(
         el2WhyRef.current,
-        { x:"0vw" },
+        { x: 0 },
         {
-          x: mdBreakpoint ? "-250vw" : "-1030vw",
-          duration: 1.5,
-          ease: "power2.out",
+          x: () => getScrollAmount(), // Functional value for responsiveness
+          duration: 2,
+          ease: "none", // Linear movement feels better for horizontal scrubs
         }
       )
+      // D. Fade out title at the very end as cards finish passing
+      .to(el1WhyRef.current, { opacity: 0, duration: 0.3 }, "-=0.5");
 
     return () => {
       tl.scrollTrigger?.kill();

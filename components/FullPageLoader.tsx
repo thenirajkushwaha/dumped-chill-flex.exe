@@ -41,7 +41,12 @@ export default function FullPageLoader({ visible }: Props) {
       <img
         src="/animation-elements/loadingScreen.svg"
         alt="Loading"
-        className="pulse-loading"
+        className="pulse-loading hidden md:block"
+      />
+      <img
+        src="/animation-elements/mob_loading.svg"
+        alt="Loading"
+        className="pulse-loading md:hidden w-[80vw]"
       />
     </div>
   );
