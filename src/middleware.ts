@@ -31,26 +31,27 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // This is the critical line: getUser() refreshes the session if it's expired
+  // 1. Refresh Session
   const { data: { user } } = await supabase.auth.getUser()
 
   const url = request.nextUrl.clone()
   const pathname = url.pathname
 
-  // 1. Handle base /admin path
+  // 2. Redirect root /admin to dashboard
   if (pathname === '/admin' || pathname === '/admin/') {
     url.pathname = '/admin/dashboard'
     return NextResponse.redirect(url)
   }
 
-  // 2. Redirect logged-in users away from login page
+  // 3. If Logged In -> Redirect away from Login
   if (user && pathname.startsWith('/admin/login')) {
     url.pathname = '/admin/dashboard'
     return NextResponse.redirect(url)
   }
 
-  // 3. Protect admin routes from unauthenticated users
-  if (!user && !pathname.startsWith('/admin/login')) {
+  // 4. If NOT Logged In -> Protect Admin Routes
+  // (We check if it starts with /admin, but isn't the login page)
+  if (!user && pathname.startsWith('/admin') && !pathname.startsWith('/admin/login')) {
     url.pathname = '/admin/login'
     return NextResponse.redirect(url)
   }
@@ -59,11 +60,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths starting with /admin
-     * but exclude static files (images, favicon, etc.)
-     */
-    '/admin/:path*',
-  ],
+  matcher: ['/admin/:path*'],
 }

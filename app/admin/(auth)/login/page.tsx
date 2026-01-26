@@ -3,85 +3,121 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
-import { ShieldCheck, Mail, Loader2, ArrowRight, CheckCircle2, AlertCircle } from "lucide-react";
+import { ShieldCheck, Mail, Loader2, ArrowRight, KeyRound, CheckCircle2, AlertCircle } from "lucide-react";
 
 export default function AdminLoginPage() {
   const router = useRouter();
+  const [step, setStep] = useState<'email' | 'otp'>('email');
   const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error' | null, msg: string | null }>({ type: null, msg: null });
 
-  // CHECK SESSION: If a user is already logged in, kick them to dashboard immediately
+  // 1. Check Session (Prevent double login)
   useEffect(() => {
     const checkUser = async () => {
       const { data } = await supabase.auth.getUser();
       if (data.user) {
         router.replace("/admin/dashboard");
-        router.refresh();
       }
     };
     checkUser();
   }, [router]);
 
-  async function handleSubmit(e: React.FormEvent) {
+  // 2. Step 1: Trigger the Email
+  async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setStatus({ type: null, msg: null });
 
     try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+      // This triggers the "Magic Link" template we edited in the dashboard
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: false, // Security: Only allow existing admins
+        }
       });
 
-      const data = await res.json();
+      if (error) throw error;
 
-      if (!res.ok) {
-        setStatus({ type: 'error', msg: data.error ?? "Login failed" });
-      } else {
-        setStatus({ type: 'success', msg: "Magic link dispatched! Please check your inbox." });
-      }
-    } catch (err) {
-      setStatus({ type: 'error', msg: "Connection error. Please try again." });
+      setStep('otp');
+      setStatus({ type: 'success', msg: "Code sent! Check your inbox." });
+    } catch (err: any) {
+      // Helpful error messages
+      const msg = err.message.includes("Signups not allowed") 
+        ? "Access denied. Admin email not found." 
+        : err.message;
+      setStatus({ type: 'error', msg });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // 3. Step 2: Verify the Code
+  async function handleVerifyOtp(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setStatus({ type: null, msg: null });
+
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token: otp,
+        type: 'email', // This matches the code sent via Magic Link template
+      });
+
+      if (error) throw error;
+
+      setStatus({ type: 'success', msg: "Verified! entering..." });
+      router.refresh(); // Refresh to update middleware state
+      router.replace("/admin/dashboard");
+      
+    } catch (err: any) {
+      setStatus({ type: 'error', msg: "Invalid or expired code." });
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-      {/* DECORATIVE BACKGROUND */}
-      <div className="fixed inset-0 -z-10 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:32px_32px] opacity-40" />
+    <div className="min-h-screen bg-white flex items-center justify-center p-6 font-sans">
+      {/* BACKGROUND DECORATION */}
+      <div className="fixed inset-0 -z-10 bg-[radial-gradient(#F0F9FF_1px,transparent_1px)] [background-size:40px_40px]" />
+      <div className="fixed top-0 right-0 p-20 opacity-20">
+         <div className="w-64 h-64 rounded-full bg-[#289BD0] blur-[100px]" />
+      </div>
 
       <div className="w-full max-w-md animate-in fade-in zoom-in duration-500">
-        <div className="bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+        <div className="bg-[#F9F9F9] rounded-[40px] shadow-2xl shadow-blue-100/50 overflow-hidden p-10">
           
           {/* HEADER */}
-          <div className="bg-[#0A2540] p-8 text-center space-y-4">
-            <div className="inline-flex p-3 bg-white/10 rounded-2xl text-white mb-2">
+          <div className="text-center space-y-4 mb-10">
+            <div className="inline-flex p-4 bg-white rounded-2xl text-[#289BD0] shadow-sm mb-2">
               <ShieldCheck size={32} />
             </div>
-            <h1 className="text-2xl font-black text-white tracking-tight uppercase">Admin Access</h1>
-            <p className="text-blue-200/60 text-sm font-medium">Verify your credentials to enter the suite</p>
+            <div>
+                <h1 className="text-3xl font-bold tracking-tight text-black">Admin <span className="text-[#289BD0]">Portal</span></h1>
+                <p className="text-gray-400 text-sm font-bold uppercase tracking-widest mt-2">Secure Access Point</p>
+            </div>
           </div>
 
-          {/* FORM AREA */}
-          <div className="p-8 space-y-6">
-            <form onSubmit={handleSubmit} className="space-y-5">
+          {/* EMAIL STEP */}
+          {step === 'email' ? (
+            <form onSubmit={handleSendOtp} className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
                   Email Address
                 </label>
                 <div className="relative group">
-                  <Mail className="absolute left-4 top-3.5 text-slate-400 group-focus-within:text-[#0A2540] transition-colors" size={18} />
+                  <Mail className="absolute left-4 top-3.5 text-gray-400 group-focus-within:text-[#289BD0] transition-colors" size={20} />
                   <input
                     type="email"
                     required
                     placeholder="name@company.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-[#0A2540] focus:bg-white transition-all font-medium"
+                    className="w-full pl-12 pr-4 py-4 bg-white border-0 rounded-2xl outline-none ring-2 ring-transparent focus:ring-[#289BD0] transition-all font-medium text-lg placeholder:text-gray-300 shadow-sm"
                   />
                 </div>
               </div>
@@ -89,41 +125,60 @@ export default function AdminLoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-[#0A2540] text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#081d33] transition-all shadow-lg shadow-blue-900/10 active:scale-[0.98] disabled:opacity-70"
+                className="w-full bg-black text-white py-5 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#289BD0] transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {loading ? (
-                  <>
-                    <Loader2 className="animate-spin" size={20} />
-                    Authenticating...
-                  </>
-                ) : (
-                  <>
-                    Send Magic Link
-                    <ArrowRight size={18} />
-                  </>
-                )}
+                {loading ? <Loader2 className="animate-spin" /> : <>Send Access Code <ArrowRight size={18} /></>}
               </button>
             </form>
-
-            {/* MESSAGE FEEDBACK */}
-            {status.msg && (
-              <div className={`p-4 rounded-2xl border flex items-start gap-3 animate-in slide-in-from-bottom-2 ${
-                status.type === 'success' 
-                ? 'bg-emerald-50 border-emerald-100 text-emerald-700' 
-                : 'bg-red-50 border-red-100 text-red-700'
-              }`}>
-                {status.type === 'success' ? <CheckCircle2 className="mt-0.5" size={18} /> : <AlertCircle className="mt-0.5" size={18} />}
-                <p className="text-sm font-bold leading-tight">{status.msg}</p>
+          ) : (
+            /* OTP STEP */
+            <form onSubmit={handleVerifyOtp} className="space-y-6 animate-in slide-in-from-right-8">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                    Enter OTP Code
+                    </label>
+                    <button 
+                        type="button" 
+                        onClick={() => { setStep('email'); setOtp(''); setStatus({ type: null, msg: null }); }}
+                        className="text-[10px] font-bold text-[#289BD0] hover:underline cursor-pointer uppercase tracking-widest"
+                    >
+                        Change Email
+                    </button>
+                </div>
+                <div className="relative group">
+                  <KeyRound className="absolute left-4 top-3.5 text-gray-400 group-focus-within:text-[#289BD0] transition-colors" size={20} />
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    placeholder="123456"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                    className="w-full pl-12 pr-4 py-4 bg-white border-0 rounded-2xl outline-none ring-2 ring-transparent focus:ring-[#289BD0] transition-all font-medium text-lg placeholder:text-gray-300 shadow-sm tracking-[0.5em]"
+                  />
+                </div>
               </div>
-            )}
-          </div>
-          
-          {/* FOOTER */}
-          <div className="p-6 bg-slate-50 border-t border-slate-100 text-center">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              Secure Environment • Alpha Version 1.0
-            </p>
-          </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-[#289BD0] text-white py-5 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-all active:scale-[0.98] disabled:opacity-70 shadow-lg shadow-blue-200"
+              >
+                {loading ? <Loader2 className="animate-spin" /> : <>Verify & Enter</>}
+              </button>
+            </form>
+          )}
+
+          {/* STATUS MESSAGES */}
+          {status.msg && (
+            <div className={`mt-6 p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 ${
+              status.type === 'success' ? 'bg-[#E8FAF0] text-[#00AA45]' : 'bg-[#FFF0F0] text-[#FF4545]'
+            }`}>
+              {status.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+              <p className="text-sm font-bold">{status.msg}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
