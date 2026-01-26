@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase/client"; // Ensure this path is correct for your project
+import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Phone, Mail, MapPin, Loader2 } from "lucide-react"; // Logos for the details
+import { Phone, Mail, MapPin, Loader2 } from "lucide-react";
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -16,17 +16,15 @@ export default function ContactPage() {
   });
   const [loading, setLoading] = useState(false);
 
-/* ---------- HANDLESUBMIT VALIDATION ---------- */
+/* HANDLESUBMIT VALIDATION */
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
-  // Basic empty field check
   if (!formData.name || !formData.phone || !formData.message) {
     alert("Please fill in all fields.");
     return;
   }
 
-  // 1. EXACT 10 DIGIT CHECK
   if (formData.phone.length !== 10) {
     alert("Please enter a valid 10-digit mobile number.");
     return;
@@ -57,7 +55,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   return (
     <div className="bg-white min-h-screen font-sans text-black pb-24">
-      {/* ---------- HERO SECTION ---------- */}
+      {/* HERO SECTION */}
       <section className="pt-24 pb-16 px-6 text-center">
         <div className="max-w-[1080px] mx-auto space-y-4">
           <h1 className="text-[72px] md:text-[82px] leading-tight font-bold tracking-tight">
@@ -71,7 +69,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
       <div className="max-w-[1100px] mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12">
         
-        {/* ---------- LEFT COLUMN: DETAILS & MAP ---------- */}
+        {/* LEFT COLUMN: DETAILS & MAP */}
         <div className="space-y-8">
           <div className="bg-[#F9F9F9] p-10 rounded-[40px] space-y-8">
             <h2 className="text-3xl font-semibold mb-6">Studio Details</h2>
@@ -126,7 +124,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
 
 
-        {/* ---------- RIGHT COLUMN: CONTACT FORM ---------- */}
+        {/* RIGHT COLUMN: CONTACT FORM */}
         <div className="bg-white border-2 border-[#F9F9F9] p-10 rounded-[40px] shadow-sm">
           <h2 className="text-3xl font-semibold mb-8">Send a Message</h2>
           <form className="space-y-8" onSubmit={handleSubmit}>
@@ -153,7 +151,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   value={formData.phone}
                   onChange={(e) => {
                     // 2. ONLY ALLOW NUMBERS & LIMIT TO 10
-                    const val = e.target.value.replace(/\D/g, ""); // Removes any non-digit chars
+                    const val = e.target.value.replace(/\D/g, "");
                     if (val.length <= 10) {
                       setFormData({ ...formData, phone: val });
                     }

@@ -50,9 +50,8 @@ export default function WhyChillThrive() {
         scrollTrigger: {
           trigger: containerWhyRef.current,
           start: "top top",
-          end: "+=175%",      // scroll distance controls timing
-          pin: true,          // 🔒 pinned screen
-          // pinSpacing: false,
+          end: "+=175%",     
+          pin: true,         
           scrub: true,
         },
       });
@@ -89,7 +88,6 @@ export default function WhyChillThrive() {
   
   return (
     <section ref={containerWhyRef} className=" mx-auto relative h-screen overflow-hidden">
-      {/* <div ref={containerWhyRef} className="h-[1px]" /> */}
       <h2 ref={el1WhyRef} className="text-9xl font-light mb-8 text-center absolute top-[calc(50vh-15px)] w-full">
         Why Chill Thrive
       </h2>

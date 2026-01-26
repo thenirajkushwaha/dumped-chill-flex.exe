@@ -7,7 +7,7 @@ export const metadata = {
 };
 
 export default async function FounderPage() {
-  // Fetching from Supabase - matching the schema provided
+  // Fetching from Supabase
   const { data: founder } = await supabase
     .from("founder_content")
     .select("*")
@@ -42,16 +42,13 @@ export default async function FounderPage() {
             />
           </div>
           <div className="space-y-2">
-            {/* <h1 className="text-6xl font-bold tracking-tight">
-              <span className="text-[#289BD0]">The</span> Founder
-            </h1> */}
             <p className="text-5xl font-light ">{founder.founder_name}</p>
           </div>
         </div>
       </section>
 
       <div className="max-w-[800px] mx-auto px-6 space-y-20 pb-24">
-        {/* ---------- MISSION & VALUES (GRID) ---------- */}
+        {/* MISSION & VALUES (GRID)*/}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <Card className="bg-[#F9F9F9] border-none shadow-none rounded-3xl p-4">
             <CardHeader>
@@ -72,7 +69,7 @@ export default async function FounderPage() {
           </Card>
         </section>
 
-        {/* ---------- FOUNDER STORY (STAGGERED) ---------- */}
+        {/* FOUNDER STORY */}
         <section className="space-y-12">
           <div className="space-y-4">
             <h2 className="text-4xl font-semibold border-l-4 border-[#289BD0] pl-6">
@@ -95,7 +92,7 @@ export default async function FounderPage() {
           </div>
         </section>
 
-        {/* ---------- SIGNATURE QUOTE ---------- */}
+        {/* SIGNATURE QUOTE */}
         <section className="pt-10">
           <div className="relative p-12 text-center bg-black rounded-[40px] overflow-hidden">
             {/* Background Accent */}

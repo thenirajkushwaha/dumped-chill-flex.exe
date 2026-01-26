@@ -53,7 +53,7 @@ export default function GalleryPage() {
     <>
       <FullPageLoader visible={loading} />
       <div className="bg-white min-h-screen font-sans text-black pb-24">
-        {/* ---------- HERO ---------- */}
+        {/* HERO */}
         <section className="pt-24 pb-16 px-6 text-center">
           <div className="max-w-[1080px] mx-auto space-y-4">
             <h1 className="text-[72px] md:text-[82px] leading-tight font-bold tracking-tight">

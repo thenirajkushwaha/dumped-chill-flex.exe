@@ -11,8 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Loader2, CheckCircle2, Clock, Calendar as CalIcon, X } from "lucide-react";
 import FullPageLoader from "@/components/FullPageLoader";
 
-/* ---------------- HELPERS ---------------- */
-
 function formatLocalDate(date: Date) {
   const offset = date.getTimezoneOffset();
   const localDate = new Date(date.getTime() - (offset * 60 * 1000));
@@ -58,7 +56,7 @@ const loadRazorpay = () => {
   });
 };
 
-/* ---------------- STEP 1: SERVICE ---------------- */
+/*STEP 1: SERVICE*/
 
 function ServiceStep({ onSelect }: { onSelect: (data: { service: Service; duration: number; price: number }) => void }) {
   const [services, setServices] = useState<Service[]>([]);
@@ -121,7 +119,7 @@ function ServiceStep({ onSelect }: { onSelect: (data: { service: Service; durati
   );
 }
 
-/* ---------------- STEP 2: DATE/TIME ---------------- */
+/*STEP 2: DATE/TIME */
 
 function DateTimeStep({ date, time, service, onBack, onNext }: any) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(date ?? new Date());
@@ -228,7 +226,7 @@ function DateTimeStep({ date, time, service, onBack, onNext }: any) {
   );
 }
 
-/* ---------------- STEP 3: DETAILS ---------------- */
+/* STEP 3: DETAILS */
 
 function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, onPricingChange }: any) {
   const [submitting, setSubmitting] = useState(false);
@@ -298,7 +296,6 @@ function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, 
       } catch (err) { console.error("Auto-apply check failed", err); }
     };
     runAutoApply();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [service.id, applyCouponLogic]);
 
   async function confirmBooking() {
@@ -460,7 +457,7 @@ function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, 
     </div>
   );
 }
-/* ---------------- MAIN COMPONENT ---------------- */
+/* MAIN COMPONENT */
 
 export default function BookingClient() {
   const [loading, setLoading] = useState(true);

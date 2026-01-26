@@ -41,16 +41,6 @@ export default function NotFound() {
             <Home size={18} className="text-slate-400 group-hover:text-[#0A2540] transition-colors" />
           </Link>
 
-          {/* <Link 
-            href="/admin/dashboard"
-            className="group flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl hover:bg-slate-100 transition-all text-left"
-          >
-            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Admin</p>
-              <p className="font-bold text-slate-700">Go to Dashboard</p>
-            </div>
-            <ChevronRight size={18} className="text-slate-400 group-hover:text-[#0A2540] transition-colors" />
-          </Link> */}
         </div>
 
         {/* Footer help */}

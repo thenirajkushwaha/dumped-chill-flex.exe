@@ -1,5 +1,3 @@
-// app/(public)/booking/page.tsx
-
 export const dynamic = "force-dynamic";
 
 import BookingClient from "./BookingClient";

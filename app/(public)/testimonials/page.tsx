@@ -40,7 +40,7 @@ export default function TestimonialsPage() {
 const getEmbedUrl = (url: string | null) => {
   if (!url) return null;
 
-  // 1. If it's already an embed link (YouTube or Vimeo), return it as is
+  // 1. If it's already an embed link (YouTube or Vimeo)
   if (url.includes("youtube.com/embed/") || url.includes("player.vimeo.com/video/")) {
     return url;
   }
@@ -53,16 +53,13 @@ const getEmbedUrl = (url: string | null) => {
 
   // 3. YouTube Shorts links
   if (url.includes("youtube.com/shorts/")) {
-    // Splits at shorts/ and then ensures no trailing slashes or params are included
     const videoId = url.split("shorts/")[1]?.split(/[?\/]/)[0];
     return `https://www.youtube.com/embed/${videoId}`;
   }
 
   // 4. Shortened YouTube links (youtu.be/)
-  // This now explicitly handles formats like https://youtu.be/HAs-KBzd69A?si=...
   if (url.includes("youtu.be/")) {
     const parts = url.split("youtu.be/")[1];
-    // This regex split handles both query parameters (?) and trailing slashes (/)
     const videoId = parts?.split(/[?\/]/)[0];
     return `https://www.youtube.com/embed/${videoId}`;
   }
@@ -81,7 +78,7 @@ const getEmbedUrl = (url: string | null) => {
       <FullPageLoader visible={loading} />
       
       <div className="bg-white min-h-screen font-sans text-black pb-24">
-        {/* ---------- HERO ---------- */}
+        {/* HERO */}
         <section className="pt-24 pb-16 px-6 text-center">
           <div className="max-w-[1080px] mx-auto space-y-4">
             <h1 className="text-[72px] md:text-[82px] leading-tight font-bold tracking-tight">
@@ -96,7 +93,7 @@ const getEmbedUrl = (url: string | null) => {
 
         <div className="max-w-[1100px] mx-auto px-6 space-y-24">
           
-          {/* ---------- VIDEO TESTIMONIALS ---------- */}
+          {/* VIDEO TESTIMONIALS */}
           <section className="space-y-10">
             <div className="flex items-center gap-4">
               <h2 className="text-3xl md:text-4xl font-semibold">Video Stories</h2>
@@ -166,7 +163,7 @@ const getEmbedUrl = (url: string | null) => {
             </div>
           </section>
 
-          {/* ---------- TEXT TESTIMONIALS ---------- */}
+          {/* TEXT TESTIMONIALS */}
           <section className="space-y-10">
             <div className="flex items-center gap-4">
               <h2 className="text-3xl md:text-4xl font-semibold">Community Feedback</h2>

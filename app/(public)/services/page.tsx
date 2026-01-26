@@ -37,7 +37,6 @@ export default function Services() {
           ytUrl: s.yt_url,
           durationMinutes: s.duration_minutes ?? [],
           benefits: s.benefits ?? [],
-          // Normalize the prices array from the database
           prices: s.prices ?? [],
         }));
 
@@ -55,7 +54,7 @@ export default function Services() {
 const getEmbedUrl = (url: string | null) => {
   if (!url) return null;
 
-  // 1. If it's already an embed link (YouTube or Vimeo), return it as is
+  // 1. If it's already an embed link (YouTube or Vimeo)
   if (url.includes("youtube.com/embed/") || url.includes("player.vimeo.com/video/")) {
     return url;
   }
@@ -68,16 +67,12 @@ const getEmbedUrl = (url: string | null) => {
 
   // 3. YouTube Shorts links
   if (url.includes("youtube.com/shorts/")) {
-    // Splits at shorts/ and then ensures no trailing slashes or params are included
     const videoId = url.split("shorts/")[1]?.split(/[?\/]/)[0];
     return `https://www.youtube.com/embed/${videoId}`;
   }
 
-  // 4. Shortened YouTube links (youtu.be/)
-  // This now explicitly handles formats like https://youtu.be/HAs-KBzd69A?si=...
   if (url.includes("youtu.be/")) {
     const parts = url.split("youtu.be/")[1];
-    // This regex split handles both query parameters (?) and trailing slashes (/)
     const videoId = parts?.split(/[?\/]/)[0];
     return `https://www.youtube.com/embed/${videoId}`;
   }
@@ -94,8 +89,6 @@ const getEmbedUrl = (url: string | null) => {
   const renderServiceCard = (s: Service) => {
     const durations = s.durationMinutes ?? [];
     const selectedDuration = selectedDurations[s.id] ?? durations[0];
-    
-    // Logic to find the price corresponding to the selected duration's index
     const durationIndex = durations.indexOf(selectedDuration);
     const displayPrice = s.prices?.[durationIndex] ?? s.prices?.[0] ?? 0;
 
@@ -137,14 +130,13 @@ const getEmbedUrl = (url: string | null) => {
           <div className="space-y-6">
             <div>
               <h3 className="text-4xl font-semibold text-black">{s.title}</h3>
-              {/* <p className="text-gray-400 text-sm mt-1">{s.slug}</p> */}
             </div>
 
             <p className="text-gray-600 leading-relaxed text-base">
               {s.description}
             </p>
 
-            {/* Benefits: Simple list, no extra colors */}
+            {/* Benefits */}
             <div className="space-y-2">
               <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-gray-400 mb-3">Included Benefits</p>
               <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -183,7 +175,6 @@ const getEmbedUrl = (url: string | null) => {
             <div className="flex items-center gap-8">
               <div className="text-right">
                 <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-gray-400">Investment</p>
-                {/* Dynamically updated price based on duration selection */}
                 <p className="text-3xl font-light">₹{displayPrice}</p>
               </div>
               <Button

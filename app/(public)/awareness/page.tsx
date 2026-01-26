@@ -58,7 +58,6 @@ export default function AwarenessPage() {
         const benefitsRow = section.querySelector(".benefits-row");
         const internalGrid = section.querySelector(".section-grid");
 
-        // Fade in grid
         gsap.from(internalGrid, {
           y: 30,
           opacity: 0,
@@ -68,7 +67,7 @@ export default function AwarenessPage() {
           }
         });
 
-        // Horizontal scroll for benefits cards
+        // Horizontal scroll
         if (benefitsRow) {
           const scrollWidth = benefitsRow.scrollWidth;
           const amountToScroll = scrollWidth - window.innerWidth;
@@ -98,7 +97,7 @@ export default function AwarenessPage() {
       <FullPageLoader visible={loading} />
 
       <main ref={containerRef} className="bg-white font-sans text-black">
-        {/* ---------- HERO SECTION ---------- */}
+        {/* HERO SECTION */}
         <section className="h-screen flex flex-col items-center justify-center relative overflow-hidden">
           <img
             src="/image/icebathhero.png"
@@ -120,7 +119,7 @@ export default function AwarenessPage() {
           </div>
         </section>
 
-        {/* ---------- CONTENT SECTIONS ---------- */}
+        {/* CONTENT SECTIONS */}
         {content.map((section, idx) => (
           <section
             key={section.id}
@@ -128,7 +127,7 @@ export default function AwarenessPage() {
           >
             <div className="section-grid max-w-[1080px] mx-auto px-6 w-full grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-20 items-center py-32">
               
-              {/* Media - Square & Static */}
+              {/* Media */}
               <div className={`relative ${idx % 2 !== 0 ? 'lg:order-2' : ''}`}>
                 <div className="w-full aspect-square rounded-[40px] overflow-hidden bg-[#F9F9F9]">
                   <img
@@ -154,7 +153,7 @@ export default function AwarenessPage() {
                   {section.description}
                 </p>
 
-                {/* Benefits List - Standardized UI Pattern */}
+                {/* Benefits List */}
                 <div className="pt-4 space-y-3">
                    <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-gray-400 mb-4">Core Principles</p>
                    <ul className="grid grid-cols-1 gap-3">
@@ -168,9 +167,6 @@ export default function AwarenessPage() {
                 </div>
               </div>
             </div>
-
-            {/* Horizontal Detail Cards - Matching "Why Chill Thrive" Horizontal Flow */}
- 
           </section>
         ))}
 
@@ -178,7 +174,7 @@ export default function AwarenessPage() {
             <CallToAction />
         </div>
 
-        {/* ---------- FOOTER / DISCLAIMER ---------- */}
+        {/* FOOTER */}
         <footer className="py-24 px-6 bg-white border-t border-gray-100">
           <div className="max-w-[1080px] mx-auto">
             <div className="flex flex-col md:flex-row gap-8 items-start text-gray-400 text-sm leading-relaxed border-l border-gray-200 pl-8">

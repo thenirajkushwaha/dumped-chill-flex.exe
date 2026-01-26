@@ -1,4 +1,3 @@
-// app/services/components/ServiceCardSkeleton.tsx
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function ServiceCardSkeleton() {
