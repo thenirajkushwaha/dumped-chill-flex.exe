@@ -427,6 +427,8 @@ export default function Home() {
   useEffect(() => {
     if (!containerWhyRef.current || !el1WhyRef.current || !el2WhyRef.current) return;
 
+    const mdBreakpoint = window.matchMedia('(min-width: 768px)');
+
     const tl = gsap.timeline({
       scrollTrigger: {
         trigger: containerWhyRef.current,
@@ -451,7 +453,7 @@ export default function Home() {
         el2WhyRef.current,
         { x:"0vw" },
         {
-          x:"-230vw",
+          x: mdBreakpoint ? "-250vw" : "-1030vw",
           duration: 1.5,
           ease: "power2.out",
         }
