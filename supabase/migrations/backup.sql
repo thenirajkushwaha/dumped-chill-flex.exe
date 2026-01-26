@@ -180,3 +180,94 @@ BEGIN
         st.start_time ASC;
 END;
 $$ LANGUAGE plpgsql;
+
+create or replace function get_service_slots(
+  query_date date,
+  query_service_id uuid
+) 
+returns table (
+  slot_id uuid,
+  start_time time,
+  end_time time,
+  capacity int,
+  booked_count bigint,
+  remaining_capacity bigint,
+  source text
+) 
+language plpgsql
+as $$
+begin
+  return query
+  with 
+  -- 1. Effective Defaults: 
+  -- We join on ID OR Start Time to ensure we catch "Added" exceptions that overlap defaults
+  effective_defaults as (
+    select 
+      st.id as original_id,
+      -- Use Exception values if present, else Default
+      coalesce(se.start_time, st.start_time) as final_start,
+      coalesce(se.end_time, st.end_time) as final_end,
+      coalesce(se.capacity, st.capacity) as final_cap,
+      coalesce(se.is_blocked, false) as is_blocked,
+      'default' as origin_type,
+      se.id as exception_id -- Track if an exception was used
+    from slot_timings st
+    left join schedule_exceptions se 
+      on (st.id = se.slot_id OR st.start_time = se.start_time) -- CRITICAL FIX: Match by time too
+      and se.exception_date = query_date
+    where st.service_id = query_service_id
+      and st.is_enabled = true
+  ),
+  
+  -- 2. Added Slots: 
+  -- Only select exceptions that did NOT match a default slot in step 1
+  added_slots as (
+    select 
+      se.id as original_id,
+      se.start_time as final_start,
+      se.end_time as final_end,
+      se.capacity as final_cap,
+      false as is_blocked,
+      'added' as origin_type,
+      null::uuid as exception_id
+    from schedule_exceptions se
+    where se.service_id = query_service_id
+      and se.exception_date = query_date
+      and se.is_added = true
+      and se.is_blocked = false
+      -- Exclude any exception that was already merged in effective_defaults
+      and se.id not in (select exception_id from effective_defaults where exception_id is not null)
+  ),
+
+  -- 3. Combine
+  all_active_slots as (
+    select * from effective_defaults where is_blocked = false
+    union all
+    select * from added_slots
+  ),
+
+  -- 4. Count Bookings
+  slot_booking_counts as (
+    select 
+      b.slot_id, 
+      count(*) as cnt
+    from bookings b
+    where b.booking_date = query_date 
+      and b.status != 'cancelled'
+    group by b.slot_id
+  )
+
+  -- 5. Final Output
+  select 
+    aas.original_id as slot_id,
+    aas.final_start as start_time,
+    aas.final_end as end_time,
+    aas.final_cap as capacity,
+    coalesce(sbc.cnt, 0) as booked_count,
+    (aas.final_cap - coalesce(sbc.cnt, 0)) as remaining_capacity,
+    aas.origin_type as source
+  from all_active_slots aas
+  left join slot_booking_counts sbc on aas.original_id = sbc.slot_id
+  order by aas.final_start asc;
+end;
+$$;

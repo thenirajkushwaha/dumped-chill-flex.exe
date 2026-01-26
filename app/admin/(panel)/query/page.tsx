@@ -100,7 +100,7 @@ export default function AdminInquiries() {
             {filteredInquiries.map((iq) => (
               <div 
                 key={iq.id} 
-                className="bg-[#F9F9F9] rounded-[32px] p-8 md:p-10 flex flex-col lg:flex-row gap-8 transition-all hover:shadow-xl hover:shadow-blue-100/50 group"
+                className="bg-[#F9F9F9] rounded-[32px] p-8 md:p-10 flex flex-col lg:flex-row gap-8 transition-all  group"
               >
                 {/* User Info Column */}
                 <div className="lg:w-1/3 space-y-6">

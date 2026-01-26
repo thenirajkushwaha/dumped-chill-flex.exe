@@ -111,8 +111,10 @@ function WhyChillThrive() {
   );
 }
 
+
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { User, Play, ExternalLink } from "lucide-react";
 
 type TestimonialPreview = {
   id: string;
@@ -123,7 +125,6 @@ type TestimonialPreview = {
   thumbnail_url?: string | null;
   rating?: number | null;
 };
-import { User } from "lucide-react"; // Add this import at the top of your file
 
 function TestimonialsPreview() {
   const router = useRouter();
@@ -146,80 +147,127 @@ function TestimonialsPreview() {
     fetchTestimonials();
   }, []);
 
+  // Robust video URL parser (Same as TestimonialsPage)
+  const getEmbedUrl = (url: string | null | undefined) => {
+    if (!url) return null;
+
+    if (url.includes("youtube.com/embed/") || url.includes("player.vimeo.com/video/")) {
+      return url;
+    }
+    if (url.includes("youtube.com/watch?v=")) {
+      const videoId = url.split("v=")[1]?.split("&")[0];
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    if (url.includes("youtube.com/shorts/")) {
+      return url.replace("shorts/", "embed/");
+    }
+    if (url.includes("youtu.be/")) {
+      const videoId = url.split("youtu.be/")[1]?.split("?")[0];
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+    if (url.includes("vimeo.com/")) {
+      const vimeoId = url.split("vimeo.com/")[1]?.split("?")[0];
+      return `https://player.vimeo.com/video/${vimeoId}`;
+    }
+    return null;
+  };
+
   if (testimonials.length === 0) return null;
 
   return (
-    <section className="max-w-[1080px] mx-auto py-24 px-4 sm:px-6 space-y-16">
-      {/* Header aligned with "Our Services" style */}
+    <section className="max-w-[1080px] mx-auto py-24 px-4 sm:px-6 space-y-16 text-black">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row items-center sm:items-end justify-between border-b border-gray-100 pb-8 gap-4">
         <div className="space-y-2 text-center sm:text-left">
           <h2 className="text-5xl md:text-6xl font-semibold tracking-tighter">
             Community Stories
           </h2>
-          <p className="text-gray-400 font-light text-lg">Real people. Real recovery.</p>
+          <p className="text-gray-400 font-light text-lg">Real people. Real results.</p>
         </div>
 
         <Button
           variant="ghost"
           onClick={() => router.push("/testimonials")}
-          className="text-xs font-bold uppercase tracking-[0.2em] text-[#289BD0] hover:bg-transparent transition-colors"
+          className="text-xs font-bold uppercase tracking-[0.2em] text-[#289BD0] hover:bg-transparent hover:text-black transition-colors"
         >
           View All Stories →
         </Button>
       </div>
 
-      {/* Grid matching the Service Card layout logic */}
-      <div className="flex flex-wrap justify-center gap-6 sm:gap-10 md:gap-12">
-        {testimonials.map((t) => (
-          <div 
-            key={t.id} 
-            className="bg-[#F9F9F9] p-6 w-full sm:w-[calc(50%-12px)] md:w-[312px] h-auto flex flex-col items-start rounded-[32px] transition-all hover:shadow-sm"
-          >
-            {/* Media Area: Matches Service Card Media proportions */}
-            <div className="w-full aspect-square overflow-hidden rounded-3xl bg-gray-200 mb-6 flex items-center justify-center">
-              {t.type === "video" && t.video_url ? (
-                <iframe
-                  src={t.video_url.includes("watch?v=") ? t.video_url.replace("watch?v=", "embed/") : t.video_url}
-                  className="w-full h-full object-cover"
-                  allowFullScreen
-                />
-              ) : t.thumbnail_url ? (
-                <img 
-                  src={t.thumbnail_url} 
-                  alt={t.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center text-gray-400 gap-2">
-                  <User size={48} strokeWidth={1.5} />
-                  <span className="text-[10px] uppercase tracking-widest font-bold">No Preview</span>
-                </div>
-              )}
-            </div>
+      {/* Grid */}
+      <div className="flex flex-wrap justify-center gap-6 sm:gap-10 md:gap-8">
+        {testimonials.map((t) => {
+          const embedUrl = getEmbedUrl(t.video_url);
 
-            {/* Identity Row */}
-            <div className="flex flex-row w-full justify-between items-start mb-4">
-              <div className="flex flex-col">
-                <span className="text-xl font-semibold leading-tight text-black">{t.name}</span>
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#00FF48]" />
-                  <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Verified Member</span>
-                </div>
+          return (
+            <div
+              key={t.id}
+              className="bg-[#F9F9F9] p-6 w-full sm:w-[calc(50%-12px)] md:w-[320px] h-auto flex flex-col items-start rounded-[32px] transition-all hover:bg-[#F0F9FF]"
+            >
+              {/* Media Area */}
+              <div className="w-full aspect-square overflow-hidden rounded-3xl bg-gray-100 mb-6 relative group">
+                {t.type === "video" && t.video_url ? (
+                  embedUrl ? (
+                    <iframe
+                      src={embedUrl}
+                      className="w-full h-full object-cover"
+                      allowFullScreen
+                      loading="lazy"
+                    />
+                  ) : (
+                    <a
+                      href={t.video_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full h-full flex flex-col items-center justify-center bg-gray-900 group-hover:bg-gray-800 transition-colors"
+                    >
+                      <div className="bg-white/10 p-4 rounded-full mb-3 backdrop-blur-sm">
+                        <Play className="text-[#289BD0] fill-[#289BD0]" size={24} />
+                      </div>
+                      <span className="text-white text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+                        Watch Video <ExternalLink size={10} />
+                      </span>
+                    </a>
+                  )
+                ) : t.thumbnail_url ? (
+                  <img
+                    src={t.thumbnail_url}
+                    alt={t.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-gray-300 gap-2">
+                    <User size={48} strokeWidth={1.5} />
+                  </div>
+                )}
               </div>
-              
-              <div className="text-[#289BD0] text-sm flex">
-                {[...Array(5)].map((_, i) => (
-                  <span key={i} className={i < (t.rating ?? 5) ? "opacity-100" : "opacity-20"}>★</span>
-                ))}
+
+              {/* Content */}
+              <div className="w-full flex flex-col flex-1">
+                <div className="flex flex-row justify-between items-start mb-3">
+                  <div className="flex flex-col">
+                    <span className="text-xl font-bold leading-tight text-black">{t.name}</span>
+                    <span className="text-[10px] uppercase tracking-widest text-[#289BD0] font-black mt-1">
+                      Verified Member
+                    </span>
+                  </div>
+
+                  <div className="text-[#289BD0] text-sm flex gap-0.5">
+                    {[...Array(5)].map((_, i) => (
+                      <span key={i} className={i < (t.rating ?? 5) ? "opacity-100" : "opacity-20"}>
+                        ★
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <p className="text-sm text-gray-600 line-clamp-4 leading-relaxed italic mt-1">
+                  {t.feedback ? `"${t.feedback}"` : "This member shared their recovery journey via video testimonial."}
+                </p>
               </div>
             </div>
-
-            {/* Feedback Text */}
-            <p className="text-sm text-gray-600 line-clamp-5 leading-relaxed italic">
-              {t.feedback ? `"${t.feedback}"` : "This member shared their recovery journey via video testimonial."}
-            </p>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

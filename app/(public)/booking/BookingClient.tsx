@@ -13,6 +13,12 @@ import FullPageLoader from "@/components/FullPageLoader";
 
 /* ---------------- HELPERS ---------------- */
 
+function formatLocalDate(date: Date) {
+  const offset = date.getTimezoneOffset();
+  const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+  return localDate.toISOString().split('T')[0];
+}
+
 function Row({ label, value, valueClass = "font-medium" }: { label: string; value: string; valueClass?: string }) {
   return (
     <div className="flex justify-between items-center py-2 border-b border-black/5 last:border-0">
@@ -32,17 +38,16 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
         />
       </div>
       <div className="flex justify-between mt-4">
-         {[1, 2, 3].map((s) => (
-           <span key={s} className={`text-[10px] font-black tracking-[0.3em] uppercase ${step >= s ? 'text-[#289BD0]' : 'text-gray-300'}`}>
-             Step 0{s}
-           </span>
-         ))}
+          {[1, 2, 3].map((s) => (
+            <span key={s} className={`text-[10px] font-black tracking-[0.3em] uppercase ${step >= s ? 'text-[#289BD0]' : 'text-gray-300'}`}>
+              Step 0{s}
+            </span>
+          ))}
       </div>
     </div>
   );
 }
 
-// Razorpay Script Loader
 const loadRazorpay = () => {
   return new Promise((resolve) => {
     const script = document.createElement("script");
@@ -118,8 +123,7 @@ function ServiceStep({ onSelect }: { onSelect: (data: { service: Service; durati
 
 /* ---------------- STEP 2: DATE/TIME ---------------- */
 
-function DateTimeStep({ date, time, onBack, onNext }: any) {
-  // FIX: Initialize with current date if none selected to trigger slot fetch immediately
+function DateTimeStep({ date, time, service, onBack, onNext }: any) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(date ?? new Date());
   const [selectedTime, setSelectedTime] = useState(time);
   const [slots, setSlots] = useState<any[]>([]);
@@ -134,15 +138,19 @@ function DateTimeStep({ date, time, onBack, onNext }: any) {
     fetchBlocked();
   }, []);
 
-  // FIX: This now runs on mount because selectedDate is initialized
   useEffect(() => {
-    if (!selectedDate) return;
+    if (!selectedDate || !service) return;
+
     const fetchSlots = async () => {
       setLoading(true);
+      const dateStr = formatLocalDate(selectedDate);
       try {
-        const res = await fetch(`/api/slots?date=${selectedDate.toISOString().split("T")[0]}`);
-        const data = await res.json();
-        setSlots(data.slots ?? []);
+        const { data, error } = await supabase.rpc('get_service_slots', {
+          query_date: dateStr,
+          query_service_id: service.id
+        });
+        if (error) throw error;
+        setSlots(data || []);
       } catch (err) {
         console.error("Failed to fetch slots", err);
       } finally {
@@ -150,7 +158,7 @@ function DateTimeStep({ date, time, onBack, onNext }: any) {
       }
     };
     fetchSlots();
-  }, [selectedDate]);
+  }, [selectedDate, service]);
 
   return (
     <div className="space-y-12">
@@ -163,7 +171,7 @@ function DateTimeStep({ date, time, onBack, onNext }: any) {
             onSelect={setSelectedDate}
             disabled={(d) => {
                 const isPast = d < new Date(new Date().setHours(0, 0, 0, 0));
-                const isBlocked = blockedDates.includes(d.toISOString().split("T")[0]);
+                const isBlocked = blockedDates.includes(formatLocalDate(d));
                 return isPast || isBlocked;
             }}
             className="rounded-md border-none"
@@ -181,14 +189,14 @@ function DateTimeStep({ date, time, onBack, onNext }: any) {
             ) : (
               slots.map((slot) => {
                 const label = `${slot.start_time.slice(0, 5)} - ${slot.end_time.slice(0, 5)}`;
-                const active = selectedTime?.slotId === slot.id;
+                const active = selectedTime?.slotId === slot.slot_id;
                 const isFull = slot.remaining_capacity <= 0;
 
                 return (
                   <button
-                    key={slot.id}
+                    key={slot.slot_id}
                     disabled={isFull}
-                    onClick={() => setSelectedTime({ slotId: slot.id, label })}
+                    onClick={() => setSelectedTime({ slotId: slot.slot_id, label })}
                     className={`p-6 rounded-[24px] text-left transition-all border-2 flex justify-between items-center ${
                       active ? "border-[#289BD0] bg-white shadow-lg scale-[1.02]" : 
                       isFull ? "opacity-50 grayscale cursor-not-allowed bg-gray-100 border-transparent" :
@@ -204,7 +212,6 @@ function DateTimeStep({ date, time, onBack, onNext }: any) {
               })
             )}
           </div>
-          
           <div className="flex gap-4 pt-6">
             <Button variant="ghost" onClick={onBack} className="flex-1 rounded-2xl h-14">Back</Button>
             <Button 
@@ -232,14 +239,39 @@ function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, 
   const { service, duration, price } = selection;
   const finalAmount = price - discount;
 
-  // Auto-Apply Coupon Logic
   useEffect(() => {
-    const autoCode = searchParams.get("promo");
-    if (autoCode) {
-      setCoupon(autoCode.toUpperCase());
-      handleApplyCoupon(autoCode.toUpperCase());
-    }
-  }, []);
+    const checkCoupons = async () => {
+        const urlCode = searchParams.get("promo");
+        if (urlCode) {
+            setCoupon(urlCode.toUpperCase());
+            handleApplyCoupon(urlCode.toUpperCase());
+            return;
+        }
+        try {
+            const now = new Date().toISOString();
+            const { data: autoCoupons } = await supabase
+                .from('coupons')
+                .select('*')
+                .eq('is_auto_apply', true)
+                .eq('is_active', true)
+                .lte('valid_from', now)
+                .gte('valid_until', now);
+            
+            if (autoCoupons && autoCoupons.length > 0) {
+                const validAutoCoupon = autoCoupons.find(c => 
+                    !c.applicable_services || 
+                    c.applicable_services.length === 0 || 
+                    c.applicable_services.includes(service.id)
+                );
+                if (validAutoCoupon) {
+                    setCoupon(validAutoCoupon.code);
+                    handleApplyCoupon(validAutoCoupon.code);
+                }
+            }
+        } catch (err) { console.error("Auto-apply check failed", err); }
+    };
+    checkCoupons();
+  }, [service.id]);
 
   async function handleApplyCoupon(codeToApply: string) {
     try {
@@ -253,17 +285,14 @@ function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, 
         setDiscount(data.discountAmount);
         onPricingChange({ baseAmount: price, discountAmount: data.discountAmount, finalAmount: price - data.discountAmount, couponCode: codeToApply });
       }
-    } catch (e) {
-      console.error("Coupon failed");
-    }
+    } catch (e) { console.error("Coupon failed"); }
   }
 
   async function confirmBooking() {
     setSubmitting(true);
-
     const bookingPayload = { 
       service, 
-      date: date.toISOString().split("T")[0], 
+      date: formatLocalDate(date), 
       slotId: time.slotId, 
       duration, 
       couponCode: coupon, 
@@ -272,7 +301,6 @@ function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, 
       form 
     };
 
-    // --- RAZORPAY FLOW ---
     if (form.payment === "QR") {
       const loaded = await loadRazorpay();
       if (!loaded) {
@@ -282,44 +310,49 @@ function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, 
       }
 
       const options = {
-        key: "rzp_test_YOUR_KEY_HERE", // Replace with your test key
-        amount: finalAmount * 100,
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID, 
+        amount: Math.round(finalAmount * 100),
         currency: "INR",
         name: "Recovery Center",
         description: `Booking: ${service.title}`,
         handler: async function (response: any) {
-          if (response.razorpay_payment_id) {
-            await finalize(bookingPayload, response.razorpay_payment_id);
-          }
+          await finalize(bookingPayload, {
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_signature: response.razorpay_signature,
+          });
         },
-        prefill: {
-          name: form.name,
-          email: form.email,
-          contact: form.phone,
-        },
+        prefill: { name: form.name, email: form.email, contact: form.phone },
         theme: { color: "#289BD0" },
+        modal: { ondismiss: () => setSubmitting(false) }
       };
 
       const rzp = new (window as any).Razorpay(options);
       rzp.open();
-      setSubmitting(false);
     } else {
-      // Cash Flow
       await finalize(bookingPayload);
     }
   }
 
-  async function finalize(payload: any, paymentId?: string) {
-    const res = await fetch("/api/booking", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, razorpayPaymentId: paymentId }),
-    });
-    
-    if (res.ok) {
-      onSuccess({ baseAmount: price, discountAmount: discount, finalAmount: finalAmount, couponCode: coupon });
+  async function finalize(payload: any, paymentDetails?: any) {
+    try {
+      const res = await fetch("/api/booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, paymentDetails }),
+      });
+      
+      if (res.ok) {
+        onSuccess({ finalAmount: finalAmount });
+      } else {
+        const err = await res.json();
+        alert(err.error || "Booking failed");
+      }
+    } catch (e) {
+      alert("Network error");
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   }
 
   return (
@@ -332,27 +365,26 @@ function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, 
               <Label className="text-[10px] font-black tracking-widest uppercase text-gray-400">{field}</Label>
               <Input
                 placeholder={`Your ${field}`}
-                value={form[field]}
+                value={(form as any)[field]}
                 onChange={(e) => setForm({ ...form, [field]: e.target.value })}
                 className="border-0 border-b-2 border-[#F9F9F9] rounded-none px-0 focus-visible:ring-0 focus-visible:border-[#289BD0] transition-colors bg-transparent text-xl h-12"
               />
             </div>
           ))}
-          
           <div className="space-y-4">
-             <Label className="text-[10px] font-black tracking-widest uppercase text-gray-400">Payment Method</Label>
-             <div className="flex gap-4">
-               {['QR', 'CASH'].map(m => (
-                 <button 
-                  key={m}
-                  type="button"
-                  onClick={() => setForm({...form, payment: m})}
-                  className={`flex-1 py-4 rounded-2xl font-bold transition-all border-2 ${form.payment === m ? 'border-black bg-black text-white' : 'border-[#F9F9F9] text-gray-400'}`}
-                 >
-                   {m === 'QR' ? 'Pay Online (Razorpay)' : 'Pay at Venue'}
-                 </button>
-               ))}
-             </div>
+              <Label className="text-[10px] font-black tracking-widest uppercase text-gray-400">Payment Method</Label>
+              <div className="flex gap-4">
+                {['QR', 'CASH'].map(m => (
+                  <button 
+                   key={m}
+                   type="button"
+                   onClick={() => setForm({...form, payment: m as any})}
+                   className={`flex-1 py-4 rounded-2xl font-bold transition-all border-2 ${form.payment === m ? 'border-black bg-black text-white' : 'border-[#F9F9F9] text-gray-400'}`}
+                  >
+                    {m === 'QR' ? 'Pay Online' : 'Pay at Venue'}
+                  </button>
+                ))}
+              </div>
           </div>
         </div>
       </div>
@@ -361,12 +393,11 @@ function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, 
         <h3 className="text-xl font-bold">Booking Summary</h3>
         <div className="space-y-3">
           <Row label="Service" value={service.title} />
-          <Row label="Date" value={date.toISOString().split("T")[0]} />
+          <Row label="Date" value={formatLocalDate(date)} />
           <Row label="Time" value={time.label} />
           <Row label="Amount" value={`₹${price}`} />
           {discount > 0 && <Row label="Coupon" value={`-₹${discount}`} valueClass="text-[#00FF48] font-bold" />}
         </div>
-        
         <div className="flex gap-2">
           <Input 
             placeholder="COUPON" 
@@ -376,7 +407,6 @@ function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, 
           />
           <Button onClick={() => handleApplyCoupon(coupon)} variant="outline" className="rounded-xl h-12 px-6">Apply</Button>
         </div>
-
         <div className="pt-6 border-t border-black/5">
           <div className="flex justify-between items-end mb-8">
             <span className="text-sm font-bold uppercase tracking-widest text-gray-400">Total Payable</span>
@@ -420,19 +450,17 @@ export default function BookingClient() {
             <CheckCircle2 size={48} />
           </div>
           <h2 className="text-5xl font-bold tracking-tight">You're all <span className="text-[#289BD0]">set.</span></h2>
-          <p className="text-gray-500 text-lg font-light">Your session is confirmed. We've sent the details to {confirmed.email}.</p>
-          
+          <p className="text-gray-500 text-lg font-light">Your session is confirmed. We've sent details to {confirmed.email}.</p>
           <div className="bg-white p-8 rounded-[32px] grid grid-cols-2 gap-6 text-left">
-             <div>
-                <Label className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Service</Label>
-                <p className="font-bold">{confirmed.service.title}</p>
-             </div>
-             <div>
-                <Label className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Time</Label>
-                <p className="font-bold">{confirmed.time.label}</p>
-             </div>
+              <div>
+                 <Label className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Service</Label>
+                 <p className="font-bold">{confirmed.service.title}</p>
+              </div>
+              <div>
+                 <Label className="text-[10px] font-black tracking-widest text-gray-400 uppercase">Time</Label>
+                 <p className="font-bold">{confirmed.time.label}</p>
+              </div>
           </div>
-
           <Button onClick={() => window.location.href = "/"} className="w-full h-16 rounded-2xl bg-black text-white text-lg">Back to Home</Button>
         </div>
       </div>
@@ -445,46 +473,24 @@ export default function BookingClient() {
       <h1 className="text-[82px] leading-none font-bold text-center pt-24 pb-12 tracking-tighter">
         Book <span className="text-[#289BD0]">Now</span>
       </h1>
-      
       <ProgressBar step={step} total={3} />
-
       <div className="max-w-[1200px] mx-auto px-6">
         {step === 1 && (
-          <ServiceStep 
-            onSelect={(data) => { 
-              setSelection(data); 
-              setPricing({ baseAmount: data.price, finalAmount: data.price }); 
-              setStep(2); 
-            }} 
-          />
+          <ServiceStep onSelect={(data) => { setSelection(data); setPricing({ finalAmount: data.price }); setStep(2); }} />
         )}
-
         {step === 2 && (
-          <DateTimeStep 
-            date={date} 
-            time={time} 
-            onBack={() => setStep(1)} 
-            onNext={(d: any, t: any) => { setDate(d); setTime(t); setStep(3); }} 
-          />
+          <DateTimeStep date={date} time={time} service={selection?.service} onBack={() => setStep(1)} onNext={(d: any, t: any) => { setDate(d); setTime(t); setStep(3); }} />
         )}
-
         {step === 3 && selection && date && time && (
           <DetailsStep
-            selection={selection}
-            date={date}
-            time={time}
-            form={form}
-            setForm={setForm}
+            selection={selection} date={date} time={time} form={form} setForm={setForm}
             onBack={() => { setTime(null); setStep(2); }}
             onPricingChange={setPricing}
             onSuccess={(pricingResult: any) => {
               setConfirmed({
                 service: selection.service,
-                duration: selection.duration,
-                date: date.toISOString().split("T")[0],
                 time: time,
                 email: form.email,
-                payment: form.payment,
                 finalAmount: pricingResult.finalAmount,
               });
             }}

@@ -1,306 +1,617 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import {
-  Calendar, Clock, ShieldAlert, ShieldCheck, 
-  Loader2, Plus, Trash2, Info, Save,
-  XCircle, CheckCircle2, Users, Settings2, Edit3
+  Calendar, Clock, AlertCircle, Plus, Trash2, 
+  Save, XCircle, RotateCcw, Lock, Unlock, Globe, Users, CalendarDays
 } from 'lucide-react';
+import { format } from 'date-fns';
 
 /* ---------- TYPES ---------- */
-interface Slot {
-  id: string;
-  start_time: string;
-  end_time: string;
-  capacity: number;
-  is_enabled: boolean;
-}
-
 interface Service {
   id: string;
   title: string;
 }
 
+interface SlotTiming {
+  id: string;
+  start_time: string;
+  end_time: string;
+  capacity: number;
+  service_id: string;
+}
+
+interface ScheduleException {
+  id: string;
+  exception_date: string;
+  slot_id: string | null;
+  service_id: string;
+  is_blocked: boolean;
+  start_time?: string;
+  end_time?: string;
+  capacity?: number;
+  is_added?: boolean;
+}
+
+interface BlockedDate {
+  id: string;
+  blocked_date: string;
+  reason: string;
+}
+
+interface MergedSlot {
+  type: 'default' | 'modified' | 'added' | 'blocked';
+  id: string; // The ID used for referencing the main slot
+  exceptionId?: string; // Reference to the exception record if it exists
+  start_time: string;
+  end_time: string;
+  capacity: number;
+  bookedCount: number;
+  remaining: number;
+  originalData?: SlotTiming;
+}
+
 export default function ScheduleManager() {
   const [loading, setLoading] = useState(true);
+  const [services, setServices] = useState<Service[]>([]);
+  const [selectedServiceId, setSelectedServiceId] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   
-  const [slots, setSlots] = useState<Slot[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [blockedDates, setBlockedDates] = useState<any[]>([]);
-  const [exceptions, setExceptions] = useState<any[]>([]);
-  const [reason, setReason] = useState('');
+  // Raw Data
+  const [defaultSlots, setDefaultSlots] = useState<SlotTiming[]>([]);
+  const [exceptions, setExceptions] = useState<ScheduleException[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [upcomingBlocks, setUpcomingBlocks] = useState<BlockedDate[]>([]);
   
-  // Slot Management State
-  const [isSlotEditorOpen, setIsSlotEditorOpen] = useState(false);
-  const [newSlot, setNewSlot] = useState({ start_time: '09:00', end_time: '10:00', capacity: 1 });
-  const [globalCapacity, setGlobalCapacity] = useState<number>(1);
-  const [isProcessing, setIsProcessing] = useState(false);
+  // Blocked Date State
+  const [isDayBlocked, setIsDayBlocked] = useState(false);
+  const [blockReason, setBlockReason] = useState('');
+  const [blockedDateId, setBlockedDateId] = useState<string | null>(null);
+
+  // Edit State
+  const [isAddingSlot, setIsAddingSlot] = useState(false);
+  const [newSlot, setNewSlot] = useState({ start: '09:00', end: '10:00', cap: 5 });
 
   useEffect(() => {
-    fetchStaticData();
-    fetchDynamicData();
-  }, [selectedDate]);
+    fetchServices();
+    fetchUpcomingBlocks();
+  }, []);
 
-  const fetchStaticData = async () => {
-    const [{ data: s }, { data: sl }] = await Promise.all([
-      supabase.from('services').select('id, title'),
-      supabase.from('slot_timings').select('*').order('start_time')
-    ]);
-    if (s) setServices(s);
-    if (sl) {
-      setSlots(sl);
-      if (sl.length > 0) setGlobalCapacity(sl[0].capacity);
+  useEffect(() => {
+    if (selectedServiceId) {
+      fetchScheduleData();
+    }
+  }, [selectedServiceId, selectedDate]);
+
+  const fetchServices = async () => {
+    const { data } = await supabase.from('services').select('id, title').order('title');
+    if (data && data.length > 0) {
+      setServices(data);
+      setSelectedServiceId(data[0].id);
     }
   };
 
-  const fetchDynamicData = async () => {
+  const fetchUpcomingBlocks = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const { data } = await supabase
+      .from('blocked_dates')
+      .select('*')
+      .gte('blocked_date', today)
+      .order('blocked_date', { ascending: true })
+      .limit(10);
+    if (data) setUpcomingBlocks(data);
+  };
+
+  const fetchScheduleData = async () => {
     setLoading(true);
-    const [{ data: bd }, { data: ex }] = await Promise.all([
-      supabase.from('blocked_dates').select('*'),
-      supabase.from('schedule_exceptions').select('*').eq('exception_date', selectedDate)
+    
+    const [defaultsRes, exceptsRes, blockedRes, bookingsRes] = await Promise.all([
+      supabase.from('slot_timings').select('*').eq('service_id', selectedServiceId).order('start_time'),
+      supabase.from('schedule_exceptions').select('*').eq('service_id', selectedServiceId).eq('exception_date', selectedDate),
+      supabase.from('blocked_dates').select('*').eq('blocked_date', selectedDate).maybeSingle(),
+      supabase.from('bookings').select('slot_id').eq('service_id', selectedServiceId).eq('booking_date', selectedDate).neq('status', 'cancelled')
     ]);
-    if (bd) setBlockedDates(bd);
-    if (ex) setExceptions(ex);
+
+    if (defaultsRes.data) setDefaultSlots(defaultsRes.data);
+    if (exceptsRes.data) setExceptions(exceptsRes.data);
+    if (bookingsRes.data) setBookings(bookingsRes.data);
+    
+    if (blockedRes.data) {
+      setIsDayBlocked(true);
+      setBlockedDateId(blockedRes.data.id);
+      setBlockReason(blockedRes.data.reason || '');
+    } else {
+      setIsDayBlocked(false);
+      setBlockedDateId(null);
+      setBlockReason('');
+    }
+
     setLoading(false);
   };
 
-  /* ---------- SLOT CRUD ACTIONS ---------- */
+  /* ---------- MERGE LOGIC (PRIORITY FIX) ---------- */
+  const mergedSchedule = useMemo(() => {
+    const combined: MergedSlot[] = [];
+    const usedExceptionIds = new Set<string>(); // Tracks exceptions merged with defaults
 
-  const addSlot = async () => {
-    setIsProcessing(true);
-    const { error } = await supabase.from('slot_timings').insert([newSlot]);
-    if (!error) {
-      fetchStaticData();
-      setIsSlotEditorOpen(false);
-    }
-    setIsProcessing(false);
-  };
+    // 1. Booking Counts Map
+    const bookingCounts: Record<string, number> = {};
+    bookings.forEach((b: any) => {
+      if (b.slot_id) bookingCounts[b.slot_id] = (bookingCounts[b.slot_id] || 0) + 1;
+    });
 
-  const deleteSlot = async (id: string) => {
-    if (!confirm("Are you sure? This will remove this slot globally and delete associated exceptions.")) return;
-    await supabase.from('slot_timings').delete().eq('id', id);
-    fetchStaticData();
-  };
+    // Helper to construct slot object
+    const buildSlot = (
+      type: MergedSlot['type'], 
+      id: string, 
+      start: string, 
+      end: string, 
+      cap: number, 
+      exceptionId?: string, 
+      original?: SlotTiming
+    ): MergedSlot => {
+      // Sum bookings from both the Default ID and the Exception ID (if merged) to be safe
+      const countDefault = bookingCounts[id] || 0;
+      const countException = exceptionId && id !== exceptionId ? (bookingCounts[exceptionId] || 0) : 0;
+      const totalBooked = countDefault + countException;
 
-  const updateGlobalCapacity = async () => {
-    setIsProcessing(true);
-    await supabase.from('slot_timings').update({ capacity: globalCapacity }).eq('is_enabled', true);
-    setSlots(prev => prev.map(s => ({ ...s, capacity: globalCapacity })));
-    setIsProcessing(false);
-  };
+      return {
+        type,
+        id,
+        exceptionId,
+        start_time: start,
+        end_time: end,
+        capacity: cap,
+        bookedCount: totalBooked,
+        remaining: Math.max(0, cap - totalBooked),
+        originalData: original
+      };
+    };
 
-  const updateSlotTiming = async (id: string, field: string, value: any) => {
-    setSlots(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
-    await supabase.from('slot_timings').update({ [field]: value }).eq('id', id);
-  };
+    // A. Process Defaults (Prioritize Exceptions)
+    defaultSlots.forEach(slot => {
+      // Strategy 1: Find exception linked by explicit Slot ID (Edit Pencil)
+      let exception = exceptions.find(e => e.slot_id === slot.id);
 
-  /* ---------- EXCEPTION ACTIONS ---------- */
+      // Strategy 2: Find exception matching TIME (Implicit Override via Add Slot)
+      // This fixes the duplicate listing issue in your screenshot
+      if (!exception) {
+        exception = exceptions.find(e => 
+          !e.slot_id && // Is an "Added" slot
+          e.start_time === slot.start_time // Times match
+        );
+      }
 
-  const toggleGlobalBlock = async () => {
-    const existing = blockedDates.find(d => d.blocked_date === selectedDate);
-    if (existing) {
-      await supabase.from('blocked_dates').delete().eq('id', existing.id);
+      if (exception) {
+        usedExceptionIds.add(exception.id); // Mark as consumed so it doesn't show up in section B
+
+        if (exception.is_blocked) {
+           combined.push(buildSlot('blocked', slot.id, slot.start_time, slot.end_time, slot.capacity, exception.id, slot));
+        } else {
+          // Merged/Modified Slot
+          combined.push(buildSlot(
+            'modified', 
+            slot.id, 
+            exception.start_time || slot.start_time, 
+            exception.end_time || slot.end_time, 
+            exception.capacity ?? slot.capacity, 
+            exception.id, 
+            slot
+          ));
+        }
+      } else {
+        // Pure Default
+        combined.push(buildSlot('default', slot.id, slot.start_time, slot.end_time, slot.capacity, undefined, slot));
+      }
+    });
+
+    // B. Process Remaining Added Slots (That didn't match any default)
+    const addedSlots = exceptions.filter(e => 
+      !e.slot_id && 
+      !e.is_blocked && 
+      !usedExceptionIds.has(e.id)
+    );
+    
+    addedSlots.forEach(exc => {
+      combined.push(buildSlot(
+        'added', 
+        exc.id, 
+        exc.start_time!, 
+        exc.end_time!, 
+        exc.capacity!, 
+        exc.id
+      ));
+    });
+
+    return combined.sort((a, b) => a.start_time.localeCompare(b.start_time));
+  }, [defaultSlots, exceptions, bookings]);
+
+
+  /* ---------- ACTIONS ---------- */
+
+  const toggleDayBlock = async () => {
+    if (isDayBlocked && blockedDateId) {
+      const { error } = await supabase.from('blocked_dates').delete().eq('id', blockedDateId);
+      if (!error) {
+        setIsDayBlocked(false);
+        setBlockedDateId(null);
+        fetchUpcomingBlocks();
+      }
     } else {
-      await supabase.from('blocked_dates').insert([{ blocked_date: selectedDate, reason }]);
+      const { data, error } = await supabase.from('blocked_dates').insert([{
+        blocked_date: selectedDate,
+        reason: blockReason || 'Maintenance'
+      }]).select().single();
+      
+      if (!error && data) {
+        setIsDayBlocked(true);
+        setBlockedDateId(data.id);
+        fetchUpcomingBlocks();
+      }
     }
-    fetchDynamicData();
-    setReason('');
   };
 
-  const toggleSlotException = async (slotId: string, serviceId: string) => {
-    const existing = exceptions.find(e => e.slot_id === slotId && e.service_id === serviceId);
-    if (existing) {
-      await supabase.from('schedule_exceptions').delete().eq('id', existing.id);
+  const deleteUpcomingBlock = async (id: string) => {
+    if(!confirm("Open this date for bookings?")) return;
+    await supabase.from('blocked_dates').delete().eq('id', id);
+    fetchUpcomingBlocks();
+    const block = upcomingBlocks.find(b => b.id === id);
+    if(block && block.blocked_date === selectedDate) {
+      fetchScheduleData();
+    }
+  };
+
+  const createDefaultSlot = async () => {
+    await supabase.from('slot_timings').insert([{
+      service_id: selectedServiceId,
+      start_time: newSlot.start,
+      end_time: newSlot.end,
+      capacity: newSlot.cap,
+      is_enabled: true
+    }]);
+    setIsAddingSlot(false);
+    fetchScheduleData();
+  };
+
+  const createExceptionSlot = async () => {
+    await supabase.from('schedule_exceptions').insert([{
+      service_id: selectedServiceId,
+      exception_date: selectedDate,
+      start_time: newSlot.start,
+      end_time: newSlot.end,
+      capacity: newSlot.cap,
+      is_blocked: false,
+      is_added: true,
+      slot_id: null
+    }]);
+    setIsAddingSlot(false);
+    fetchScheduleData();
+  };
+
+  const updateSlotOverride = async (slot: MergedSlot, newCap: number) => {
+    if (slot.type === 'default') {
+      await supabase.from('schedule_exceptions').insert([{
+        service_id: selectedServiceId,
+        exception_date: selectedDate,
+        slot_id: slot.id,
+        start_time: slot.start_time,
+        end_time: slot.end_time,
+        capacity: newCap,
+        is_blocked: false
+      }]);
+    } else if (slot.exceptionId) {
+      await supabase.from('schedule_exceptions').update({ capacity: newCap }).eq('id', slot.exceptionId);
+    }
+    fetchScheduleData();
+  };
+
+  const toggleSlotBlock = async (slot: MergedSlot) => {
+    if (slot.type === 'blocked') {
+      if (slot.exceptionId) await supabase.from('schedule_exceptions').delete().eq('id', slot.exceptionId);
     } else {
       await supabase.from('schedule_exceptions').insert([{
+        service_id: selectedServiceId,
         exception_date: selectedDate,
-        slot_id: slotId,
-        service_id: serviceId,
+        slot_id: slot.id,
         is_blocked: true
       }]);
     }
-    fetchDynamicData();
+    fetchScheduleData();
   };
 
-  const isFullDayBlocked = blockedDates.some(d => d.blocked_date === selectedDate);
+  const deleteAddedSlot = async (exceptionId: string) => {
+    if (!confirm("Remove this additional slot?")) return;
+    await supabase.from('schedule_exceptions').delete().eq('id', exceptionId);
+    fetchScheduleData();
+  };
+
+  const deleteDefaultSlot = async (slotId: string) => {
+    if (!confirm("⚠️ WARNING: This is a Master Slot.\n\nDeleting this will remove it from ALL FUTURE DATES.\n\nAre you sure you want to permanently delete this schedule?")) return;
+    await supabase.from('slot_timings').delete().eq('id', slotId);
+    await supabase.from('schedule_exceptions').delete().eq('slot_id', slotId);
+    fetchScheduleData();
+  };
 
   return (
-    <div className="p-4 md:p-10 bg-slate-50 min-h-screen space-y-8 max-w-7xl mx-auto">
+    <div className="p-6 md:p-10 bg-slate-50 min-h-screen space-y-8 max-w-7xl mx-auto">
       
-      {/* HEADER SECTION */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-[#0A2540] p-8 rounded-3xl text-white shadow-xl">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
-            <Clock className="text-blue-400" size={28} /> Schedule Overrides
-          </h1>
-          <p className="text-blue-200/60 font-medium">Define your master schedule and daily exceptions</p>
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Slot Manager</h1>
+          <p className="text-slate-500 font-medium">Configure defaults and daily exceptions</p>
         </div>
-
-        <div className="flex flex-col sm:flex-row items-center gap-4 bg-white/10 p-2 rounded-2xl w-full lg:w-auto">
-          <input 
-            type="date" 
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="bg-white text-slate-900 font-black rounded-xl outline-none px-6 py-2 w-full sm:w-auto"
-          />
+        
+        <div className="flex items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-200 overflow-x-auto max-w-full">
+           {services.map(s => (
+             <button
+              key={s.id}
+              onClick={() => setSelectedServiceId(s.id)}
+              className={`px-4 py-2 rounded-xl text-sm font-black transition-all whitespace-nowrap ${
+                selectedServiceId === s.id 
+                ? 'bg-[#0A2540] text-white shadow-md' 
+                : 'text-slate-500 hover:bg-slate-50'
+              }`}
+             >
+               {s.title}
+             </button>
+           ))}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* SIDEBAR: SLOT & GLOBAL MANAGEMENT */}
+        {/* LEFT COLUMN: Controls */}
         <div className="lg:col-span-4 space-y-6">
-          
-          {/* Master Slot Configuration */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Settings2 size={18} className="text-indigo-600" />
-                <h3 className="font-black text-sm uppercase tracking-widest text-slate-800">Master Slots</h3>
+           {/* Date Picker */}
+           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 block">Selected Date</label>
+              <input 
+                type="date" 
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full text-lg font-black text-slate-800 bg-slate-50 p-4 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20"
+              />
+              <div className="mt-4 flex items-start gap-3 p-4 bg-blue-50 rounded-xl">
+                <AlertCircle className="text-blue-600 shrink-0" size={20} />
+                <p className="text-xs text-blue-800 leading-relaxed font-medium">
+                  Editing <strong>{format(new Date(selectedDate), 'dd MMM yyyy')}</strong>.
+                </p>
               </div>
-              <button 
-                onClick={() => setIsSlotEditorOpen(!isSlotEditorOpen)}
-                className="text-[10px] font-black bg-slate-900 text-white px-2 py-1 rounded uppercase"
-              >
-                {isSlotEditorOpen ? 'Close' : 'Add Slot'}
-              </button>
-            </div>
+           </div>
 
-            {isSlotEditorOpen && (
-              <div className="bg-slate-50 p-4 rounded-2xl space-y-3 animate-in fade-in slide-in-from-top-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <input type="time" value={newSlot.start_time} onChange={e => setNewSlot({...newSlot, start_time: e.target.value})} className="p-2 border rounded-lg text-sm font-bold" />
-                  <input type="time" value={newSlot.end_time} onChange={e => setNewSlot({...newSlot, end_time: e.target.value})} className="p-2 border rounded-lg text-sm font-bold" />
-                </div>
-                <button onClick={addSlot} disabled={isProcessing} className="w-full py-2 bg-indigo-600 text-white rounded-lg font-black text-xs uppercase tracking-widest">
-                  Confirm New Slot
-                </button>
+           {/* Day Closure Control */}
+           <div className={`p-6 rounded-3xl border-2 transition-all ${isDayBlocked ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200 shadow-sm'}`}>
+              <div className="flex items-center gap-3 mb-4">
+                 <div className={`p-2 rounded-lg ${isDayBlocked ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
+                    {isDayBlocked ? <Lock size={20} /> : <Unlock size={20} />}
+                 </div>
+                 <h3 className="font-black text-sm uppercase tracking-widest text-slate-800">Full Day Closure</h3>
               </div>
-            )}
 
-            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-              {slots.map(slot => (
-                <div key={slot.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl group">
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="time" 
-                      value={slot.start_time.slice(0,5)} 
-                      onChange={e => updateSlotTiming(slot.id, 'start_time', e.target.value)}
-                      className="bg-transparent font-bold text-xs text-slate-600 outline-none"
-                    />
-                    <span className="text-slate-300">-</span>
-                    <input 
-                      type="time" 
-                      value={slot.end_time.slice(0,5)} 
-                      onChange={e => updateSlotTiming(slot.id, 'end_time', e.target.value)}
-                      className="bg-transparent font-bold text-xs text-slate-600 outline-none"
-                    />
-                  </div>
-                  <button onClick={() => deleteSlot(slot.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Trash2 size={14} />
+              {isDayBlocked ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-red-600 font-bold bg-white/50 p-3 rounded-lg border border-red-100">
+                     Blocked: "{blockReason}"
+                  </p>
+                  <button 
+                    onClick={toggleDayBlock} 
+                    className="w-full py-3 bg-white border-2 border-red-200 text-red-500 hover:bg-red-50 font-black rounded-xl text-xs uppercase tracking-widest transition-colors"
+                  >
+                    Open Bookings
                   </button>
                 </div>
-              ))}
-            </div>
-          </div>
+              ) : (
+                <div className="space-y-3">
+                  <input 
+                    type="text" 
+                    placeholder="Reason (e.g. Holiday)" 
+                    value={blockReason}
+                    onChange={(e) => setBlockReason(e.target.value)}
+                    className="w-full p-3 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-slate-400 font-bold placeholder:font-medium"
+                  />
+                  <button 
+                    onClick={toggleDayBlock} 
+                    className="w-full py-3 bg-slate-900 text-white hover:bg-slate-800 font-black rounded-xl text-xs uppercase tracking-widest transition-colors"
+                  >
+                    Block Entire Day
+                  </button>
+                </div>
+              )}
+           </div>
 
-          {/* Fleet Capacity */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Users size={18} className="text-indigo-600" />
-              <h3 className="font-black text-sm uppercase tracking-widest text-slate-800">Fleet Capacity</h3>
-            </div>
-            <div className="flex gap-2">
-              <input type="number" value={globalCapacity} onChange={(e) => setGlobalCapacity(parseInt(e.target.value))} className="w-full p-3 bg-slate-50 border rounded-xl font-bold text-center outline-none" />
-              <button onClick={updateGlobalCapacity} className="bg-indigo-600 text-white px-4 rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-100">
-                <Save size={18}/>
-              </button>
-            </div>
-          </div>
-
-          {/* Closure Card */}
-          <div className={`p-6 rounded-3xl border-2 transition-all ${isFullDayBlocked ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200 shadow-sm'}`}>
-            <h3 className="font-black text-sm uppercase tracking-widest text-slate-800 mb-4">Closure Actions</h3>
-            {isFullDayBlocked ? (
-              <button onClick={toggleGlobalBlock} className="w-full py-3 bg-white border-2 border-red-500 text-red-500 font-black rounded-xl text-[10px] uppercase tracking-widest">Remove Date Block</button>
-            ) : (
-              <div className="space-y-4">
-                <input placeholder="Reason..." value={reason} onChange={(e) => setReason(e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl text-sm" />
-                <button onClick={toggleGlobalBlock} className="w-full py-3 bg-red-600 text-white font-black rounded-xl text-[10px] uppercase tracking-widest">Block Entire Date</button>
+           {/* Upcoming Closures List */}
+           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm max-h-[300px] overflow-y-auto">
+              <div className="flex items-center gap-2 mb-4">
+                <CalendarDays size={18} className="text-slate-400"/>
+                <h3 className="font-black text-sm uppercase tracking-widest text-slate-800">Upcoming Closures</h3>
               </div>
-            )}
-          </div>
+              
+              {upcomingBlocks.length === 0 ? (
+                <p className="text-xs text-slate-400 font-medium italic">No upcoming blocked dates.</p>
+              ) : (
+                <div className="space-y-3">
+                  {upcomingBlocks.map(block => (
+                    <div key={block.id} className="group flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 hover:border-red-100 transition-colors">
+                      <div>
+                        <p className="text-xs font-black text-slate-800">{format(new Date(block.blocked_date), 'dd MMM yyyy')}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{block.reason}</p>
+                      </div>
+                      <button 
+                        onClick={() => deleteUpcomingBlock(block.id)}
+                        className="p-2 text-slate-300 hover:text-red-500 bg-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+           </div>
+
+           {/* Legend */}
+           <div className="p-6 bg-[#0A2540] rounded-3xl text-white">
+              <h3 className="font-black text-lg mb-4">Legend</h3>
+              <div className="space-y-3 text-sm font-medium opacity-80">
+                <div className="flex items-center gap-3"><div className="w-3 h-3 rounded-full bg-slate-400"></div> Default Slot</div>
+                <div className="flex items-center gap-3"><div className="w-3 h-3 rounded-full bg-blue-500"></div> Modified Capacity</div>
+                <div className="flex items-center gap-3"><div className="w-3 h-3 rounded-full bg-emerald-500"></div> Added for this day</div>
+                <div className="flex items-center gap-3"><div className="w-3 h-3 rounded-full bg-red-500"></div> Blocked Slot</div>
+              </div>
+           </div>
         </div>
 
-        {/* MAIN MATRIX */}
-        <div className={`lg:col-span-8 space-y-6 ${isFullDayBlocked ? 'opacity-20 pointer-events-none grayscale' : ''}`}>
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden relative min-h-[400px]">
-            <div className="p-6 border-b flex justify-between items-center bg-white sticky top-0 z-10">
-              <h3 className="font-black text-slate-800 flex items-center gap-2 uppercase text-xs tracking-widest">
-                Daily Availability Matrix
-              </h3>
-              <div className="flex items-center gap-4">
-                 <div className="flex items-center gap-2"><div className="w-2 h-2 bg-emerald-500 rounded-full"></div><span className="text-[10px] font-black text-slate-400 uppercase">Open</span></div>
-                 <div className="flex items-center gap-2"><div className="w-2 h-2 bg-red-500 rounded-full"></div><span className="text-[10px] font-black text-slate-400 uppercase">Blocked</span></div>
+        {/* RIGHT COLUMN: SLOT LIST */}
+        <div className={`lg:col-span-8 space-y-4 transition-all ${isDayBlocked ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+          
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="text-xl font-bold text-slate-800">
+              Slots for {format(new Date(selectedDate), 'MMMM do')}
+            </h2>
+            <button 
+              onClick={() => setIsAddingSlot(true)}
+              className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-colors"
+            >
+              <Plus size={16} /> Add Slot
+            </button>
+          </div>
+
+          {/* ADD SLOT FORM */}
+          {isAddingSlot && (
+            <div className="bg-white border-2 border-indigo-100 p-6 rounded-2xl shadow-lg mb-6 animate-in slide-in-from-top-4">
+              <h3 className="text-xs font-black text-indigo-600 uppercase tracking-widest mb-4">New Slot Details</h3>
+              <div className="flex gap-4 mb-4">
+                <div className="flex-1 space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Start</label>
+                  <input type="time" value={newSlot.start} onChange={e => setNewSlot({...newSlot, start: e.target.value})} className="w-full p-2 bg-slate-50 rounded-lg font-bold" />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">End</label>
+                  <input type="time" value={newSlot.end} onChange={e => setNewSlot({...newSlot, end: e.target.value})} className="w-full p-2 bg-slate-50 rounded-lg font-bold" />
+                </div>
+                <div className="w-24 space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Cap</label>
+                  <input type="number" value={newSlot.cap} onChange={e => setNewSlot({...newSlot, cap: parseInt(e.target.value)})} className="w-full p-2 bg-slate-50 rounded-lg font-bold" />
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={createExceptionSlot} className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm">Add for {format(new Date(selectedDate), 'MMM do')} Only</button>
+                <button onClick={createDefaultSlot} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm">Add to Defaults (All Days)</button>
+                <button onClick={() => setIsAddingSlot(false)} className="px-4 py-3 text-slate-400 font-bold text-sm">Cancel</button>
               </div>
             </div>
+          )}
 
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-slate-50">
-                    <th className="p-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest border-b">Slot (Slots Size)</th>
-                    {services.map(service => (
-                      <th key={service.id} className="p-4 text-center text-[10px] font-black text-slate-800 uppercase tracking-widest border-b border-l border-slate-100 min-w-[120px]">
-                        {service.title}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {slots.map(slot => (
-                    <tr key={slot.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-6 bg-slate-50/30">
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="font-black text-sm text-slate-700 whitespace-nowrap">{slot.start_time.slice(0,5)} - {slot.end_time.slice(0,5)}</div>
-                          <input 
-                            type="number" 
-                            value={slot.capacity} 
-                            onChange={(e) => updateSlotTiming(slot.id, 'capacity', parseInt(e.target.value))}
-                            className="w-12 p-1.5 bg-white border border-slate-200 rounded-lg text-xs font-black text-center outline-none focus:border-indigo-500"
-                          />
-                        </div>
-                      </td>
-                      {services.map(service => {
-                        const isBlocked = exceptions.some(e => e.slot_id === slot.id && e.service_id === service.id);
-                        return (
-                          <td key={service.id} className="p-3 border-l border-slate-100">
-                            <button
-                              onClick={() => toggleSlotException(slot.id, service.id)}
-                              className={`w-full py-2.5 rounded-xl font-black text-[9px] transition-all flex flex-col items-center justify-center gap-1 ${
-                                isBlocked ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100 hover:scale-105'
-                              }`}
-                            >
-                              {isBlocked ? <XCircle size={14} /> : <CheckCircle2 size={14} />}
-                              {isBlocked ? 'BLOCKED' : 'AVAILABLE'}
-                            </button>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            
-            {loading && (
-              <div className="absolute inset-0 bg-white/60 flex items-center justify-center backdrop-blur-sm z-20">
-                <Loader2 className="animate-spin text-slate-900" size={40} />
+          {/* SLOT LIST */}
+          <div className="space-y-3">
+            {mergedSchedule.map((slot, idx) => {
+              const isBlocked = slot.type === 'blocked';
+              
+              let borderClass = 'border-slate-100';
+              let bgClass = 'bg-white';
+              let accentColor = 'text-slate-600';
+
+              if (slot.type === 'modified') { borderClass = 'border-blue-200'; bgClass = 'bg-blue-50/30'; accentColor = 'text-blue-600'; }
+              if (slot.type === 'added') { borderClass = 'border-emerald-200'; bgClass = 'bg-emerald-50/30'; accentColor = 'text-emerald-600'; }
+              if (isBlocked) { borderClass = 'border-red-100'; bgClass = 'bg-red-50/50 grayscale opacity-75'; accentColor = 'text-red-400'; }
+
+              return (
+                <div key={`${slot.type}-${slot.id}-${idx}`} className={`group relative p-4 rounded-2xl border-2 ${borderClass} ${bgClass} transition-all hover:shadow-md flex items-center justify-between`}>
+                  
+                  {/* LEFT: Time & Info */}
+                  <div className="flex items-center gap-6">
+                    <div className={`p-3 rounded-xl ${isBlocked ? 'bg-red-100' : 'bg-slate-100'} ${accentColor}`}>
+                      <Clock size={20} />
+                    </div>
+                    <div>
+                      <h4 className={`text-lg font-black ${isBlocked ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                        {slot.start_time.slice(0, 5)} - {slot.end_time.slice(0, 5)}
+                      </h4>
+                      <div className="flex items-center gap-2">
+                         <span className={`text-[10px] font-black uppercase tracking-widest ${accentColor}`}>
+                            {slot.type === 'default' ? 'Standard' : slot.type}
+                         </span>
+                         {slot.type === 'default' && (
+                           <span className="flex items-center gap-1 text-[9px] bg-slate-100 px-2 py-0.5 rounded text-slate-400 font-bold ml-2">
+                             <Globe size={10} /> GLOBAL
+                           </span>
+                         )}
+                         {/* Bookings Badge */}
+                         {!isBlocked && (
+                           <div className={`ml-2 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide flex items-center gap-1 ${
+                             slot.remaining === 0 ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
+                           }`}>
+                             <Users size={10} />
+                             {slot.bookedCount} Booked / {slot.remaining} Left
+                           </div>
+                         )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* RIGHT: Controls */}
+                  <div className="flex items-center gap-4">
+                    {!isBlocked && (
+                      <div className="flex flex-col items-center">
+                        <label className="text-[9px] font-black text-slate-300 uppercase mb-1">Capacity</label>
+                        <input 
+                          type="number" 
+                          disabled={slot.type === 'blocked'}
+                          value={slot.capacity}
+                          onChange={(e) => updateSlotOverride(slot, parseInt(e.target.value))}
+                          className={`w-16 p-2 text-center font-bold rounded-lg border focus:ring-2 focus:ring-blue-500 outline-none ${slot.type === 'modified' ? 'bg-white border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
+                        />
+                      </div>
+                    )}
+
+                    <div className="w-px h-10 bg-slate-100 mx-2"></div>
+
+                    {/* Actions */}
+                    {slot.type === 'added' ? (
+                       <button onClick={() => deleteAddedSlot(slot.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Delete extra slot">
+                         <Trash2 size={18} />
+                       </button>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={() => toggleSlotBlock(slot)} 
+                          className={`p-2 rounded-lg transition-colors ${isBlocked ? 'text-emerald-500 hover:bg-emerald-50' : 'text-slate-300 hover:text-orange-500 hover:bg-orange-50'}`}
+                          title={isBlocked ? "Restore Slot for this day" : "Block Slot for this day"}
+                        >
+                          {isBlocked ? <RotateCcw size={18} /> : <XCircle size={18} />}
+                        </button>
+                        
+                        {/* Only Default slots can be globally deleted */}
+                        {slot.type === 'default' && (
+                          <button 
+                            onClick={() => deleteDefaultSlot(slot.id)} 
+                            className="p-2 rounded-lg transition-colors text-slate-300 hover:text-red-600 hover:bg-red-50"
+                            title="PERMANENTLY Delete this slot (Global Rule)"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className={`absolute top-1/2 -translate-y-1/2 left-0 w-1 h-12 rounded-r-full ${
+                    slot.type === 'default' ? 'bg-slate-300' : 
+                    slot.type === 'modified' ? 'bg-blue-500' : 
+                    slot.type === 'added' ? 'bg-emerald-500' : 'bg-red-500'
+                  }`}></div>
+                </div>
+              );
+            })}
+
+            {mergedSchedule.length === 0 && !loading && (
+              <div className="text-center py-12 bg-white rounded-3xl border border-dashed border-slate-300">
+                <p className="text-slate-400 font-medium">No slots configured for this day.</p>
               </div>
             )}
           </div>
+
         </div>
       </div>
     </div>
