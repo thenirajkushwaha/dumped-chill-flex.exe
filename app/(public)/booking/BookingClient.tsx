@@ -239,65 +239,93 @@ function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, 
   const { service, duration, price } = selection;
   const finalAmount = price - discount;
 
-  useEffect(() => {
-    const checkCoupons = async () => {
-        const urlCode = searchParams.get("promo");
-        if (urlCode) {
-            setCoupon(urlCode.toUpperCase());
-            handleApplyCoupon(urlCode.toUpperCase());
-            return;
-        }
-        try {
-            const now = new Date().toISOString();
-            const { data: autoCoupons } = await supabase
-                .from('coupons')
-                .select('*')
-                .eq('is_auto_apply', true)
-                .eq('is_active', true)
-                .lte('valid_from', now)
-                .gte('valid_until', now);
-            
-            if (autoCoupons && autoCoupons.length > 0) {
-                const validAutoCoupon = autoCoupons.find(c => 
-                    !c.applicable_services || 
-                    c.applicable_services.length === 0 || 
-                    c.applicable_services.includes(service.id)
-                );
-                if (validAutoCoupon) {
-                    setCoupon(validAutoCoupon.code);
-                    handleApplyCoupon(validAutoCoupon.code);
-                }
-            }
-        } catch (err) { console.error("Auto-apply check failed", err); }
-    };
-    checkCoupons();
-  }, [service.id]);
-
-  async function handleApplyCoupon(codeToApply: string) {
+  const applyCouponLogic = useCallback(async (codeToApply: string) => {
+    if (!codeToApply || codeToApply.trim() === "") return 0;
     try {
       const res = await fetch("/api/coupon", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: codeToApply, serviceId: service.id, duration }),
+        body: JSON.stringify({ code: codeToApply.toUpperCase(), serviceId: service.id, duration }),
       });
       const data = await res.json();
+      
       if (data.valid) {
         setDiscount(data.discountAmount);
-        onPricingChange({ baseAmount: price, discountAmount: data.discountAmount, finalAmount: price - data.discountAmount, couponCode: codeToApply });
+        setCoupon(codeToApply.toUpperCase());
+        onPricingChange({ 
+          baseAmount: price, 
+          discountAmount: data.discountAmount, 
+          finalAmount: price - data.discountAmount, 
+          couponCode: codeToApply.toUpperCase() 
+        });
+        return data.discountAmount;
       }
-    } catch (e) { console.error("Coupon failed"); }
-  }
+      return 0;
+    } catch (e) {
+      console.error("Coupon failed", e);
+      return 0;
+    }
+  }, [service.id, duration, price, onPricingChange]);
+
+  useEffect(() => {
+    const runAutoApply = async () => {
+      const urlCode = searchParams.get("promo");
+      if (urlCode) {
+        await applyCouponLogic(urlCode);
+        return;
+      }
+
+      try {
+        const now = new Date().toISOString();
+        const { data: autoCoupons } = await supabase
+          .from('coupons')
+          .select('*')
+          .eq('is_auto_apply', true)
+          .eq('is_active', true)
+          .lte('valid_from', now)
+          .gte('valid_until', now);
+        
+        if (autoCoupons && autoCoupons.length > 0) {
+          const validAutoCoupon = autoCoupons.find(c => 
+            !c.applicable_services || 
+            c.applicable_services.length === 0 || 
+            c.applicable_services.includes(service.id)
+          );
+          if (validAutoCoupon) {
+            await applyCouponLogic(validAutoCoupon.code);
+          }
+        }
+      } catch (err) { console.error("Auto-apply check failed", err); }
+    };
+    runAutoApply();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [service.id, applyCouponLogic]);
 
   async function confirmBooking() {
+    if (form.phone.length !== 10) {
+      alert("Please enter exactly 10 digits for the mobile number.");
+      return;
+    }
+
     setSubmitting(true);
+
+    // FORCE APPLY: If a user typed a coupon but didn't click "Apply"
+    let currentDiscount = discount;
+    if (coupon && discount === 0) {
+        const val = await applyCouponLogic(coupon);
+        currentDiscount = val;
+    }
+
+    const calculatedFinal = price - currentDiscount;
+
     const bookingPayload = { 
       service, 
       date: formatLocalDate(date), 
       slotId: time.slotId, 
       duration, 
       couponCode: coupon, 
-      discountAmount: discount, 
-      finalAmount: finalAmount, 
+      discountAmount: currentDiscount, 
+      finalAmount: calculatedFinal, 
       form 
     };
 
@@ -311,7 +339,7 @@ function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, 
 
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID, 
-        amount: Math.round(finalAmount * 100),
+        amount: Math.round(calculatedFinal * 100),
         currency: "INR",
         name: "Recovery Center",
         description: `Booking: ${service.title}`,
@@ -343,7 +371,7 @@ function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, 
       });
       
       if (res.ok) {
-        onSuccess({ finalAmount: finalAmount });
+        onSuccess({ finalAmount: payload.finalAmount });
       } else {
         const err = await res.json();
         alert(err.error || "Booking failed");
@@ -366,7 +394,14 @@ function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, 
               <Input
                 placeholder={`Your ${field}`}
                 value={(form as any)[field]}
-                onChange={(e) => setForm({ ...form, [field]: e.target.value })}
+                onChange={(e) => {
+                  if (field === 'phone') {
+                    const val = e.target.value.replace(/\D/g, "");
+                    if (val.length <= 10) setForm({ ...form, phone: val });
+                  } else {
+                    setForm({ ...form, [field]: e.target.value });
+                  }
+                }}
                 className="border-0 border-b-2 border-[#F9F9F9] rounded-none px-0 focus-visible:ring-0 focus-visible:border-[#289BD0] transition-colors bg-transparent text-xl h-12"
               />
             </div>
@@ -405,7 +440,7 @@ function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, 
             onChange={e => setCoupon(e.target.value.toUpperCase())}
             className="rounded-xl border-none bg-white h-12"
           />
-          <Button onClick={() => handleApplyCoupon(coupon)} variant="outline" className="rounded-xl h-12 px-6">Apply</Button>
+          <Button onClick={() => applyCouponLogic(coupon)} variant="outline" className="rounded-xl h-12 px-6">Apply</Button>
         </div>
         <div className="pt-6 border-t border-black/5">
           <div className="flex justify-between items-end mb-8">
@@ -425,7 +460,6 @@ function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, 
     </div>
   );
 }
-
 /* ---------------- MAIN COMPONENT ---------------- */
 
 export default function BookingClient() {

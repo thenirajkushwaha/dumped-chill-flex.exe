@@ -16,33 +16,44 @@ export default function ContactPage() {
   });
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.phone || !formData.message) {
-      alert("Please fill in all fields.");
-      return;
-    }
+/* ---------- HANDLESUBMIT VALIDATION ---------- */
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    setLoading(true);
-    try {
-      const { error } = await supabase.from("inquiries").insert([
-        {
-          full_name: formData.name,
-          phone_number: formData.phone,
-          message: formData.message,
-        },
-      ]);
+  // Basic empty field check
+  if (!formData.name || !formData.phone || !formData.message) {
+    alert("Please fill in all fields.");
+    return;
+  }
 
-      if (error) throw error;
+  // 1. EXACT 10 DIGIT CHECK
+  if (formData.phone.length !== 10) {
+    alert("Please enter a valid 10-digit mobile number.");
+    return;
+  }
 
-      alert("Message sent successfully!");
-      setFormData({ name: "", phone: "", message: "" });
-    } catch (error: any) {
-      alert(error.message || "Failed to send message.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    const { error } = await supabase.from("inquiries").insert([
+      {
+        full_name: formData.name,
+        phone_number: formData.phone,
+        message: formData.message,
+      },
+    ]);
+
+    if (error) throw error;
+
+    alert("Message sent successfully!");
+    setFormData({ name: "", phone: "", message: "" });
+  } catch (error: any) {
+    alert(error.message || "Failed to send message.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   return (
     <div className="bg-white min-h-screen font-sans text-black pb-24">
@@ -113,6 +124,8 @@ export default function ContactPage() {
           </div>
         </div>
 
+
+
         {/* ---------- RIGHT COLUMN: CONTACT FORM ---------- */}
         <div className="bg-white border-2 border-[#F9F9F9] p-10 rounded-[40px] shadow-sm">
           <h2 className="text-3xl font-semibold mb-8">Send a Message</h2>
@@ -122,7 +135,7 @@ export default function ContactPage() {
                 <Label htmlFor="name" className="text-xs uppercase tracking-widest font-bold text-gray-400">Full Name</Label>
                 <Input
                   id="name"
-                  placeholder="John Doe"
+                  placeholder="Name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="border-0 border-b-2 border-[#F9F9F9] rounded-none px-0 focus-visible:ring-0 focus-visible:border-[#289BD0] transition-colors bg-transparent text-lg"
@@ -130,12 +143,21 @@ export default function ContactPage() {
               </div>
 
               <div className="space-y-3">
-                <Label htmlFor="phone" className="text-xs uppercase tracking-widest font-bold text-gray-400">Phone Number</Label>
+                <Label htmlFor="phone" className="text-xs uppercase tracking-widest font-bold text-gray-400">
+                  Phone Number
+                </Label>
                 <Input
                   id="phone"
-                  placeholder="+91 00000 00000"
+                  type="tel"
+                  placeholder="Number"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) => {
+                    // 2. ONLY ALLOW NUMBERS & LIMIT TO 10
+                    const val = e.target.value.replace(/\D/g, ""); // Removes any non-digit chars
+                    if (val.length <= 10) {
+                      setFormData({ ...formData, phone: val });
+                    }
+                  }}
                   className="border-0 border-b-2 border-[#F9F9F9] rounded-none px-0 focus-visible:ring-0 focus-visible:border-[#289BD0] transition-colors bg-transparent text-lg"
                 />
               </div>

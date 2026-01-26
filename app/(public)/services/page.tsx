@@ -51,6 +51,46 @@ export default function Services() {
     fetchServices();
   }, []);
 
+      // Helper to check if URL is embeddable
+const getEmbedUrl = (url: string | null) => {
+  if (!url) return null;
+
+  // 1. If it's already an embed link (YouTube or Vimeo), return it as is
+  if (url.includes("youtube.com/embed/") || url.includes("player.vimeo.com/video/")) {
+    return url;
+  }
+
+  // 2. Standard YouTube links (handle watch?v=)
+  if (url.includes("youtube.com/watch?v=")) {
+    const videoId = url.split("v=")[1]?.split("&")[0];
+    return `https://www.youtube.com/embed/${videoId}`;
+  }
+
+  // 3. YouTube Shorts links
+  if (url.includes("youtube.com/shorts/")) {
+    // Splits at shorts/ and then ensures no trailing slashes or params are included
+    const videoId = url.split("shorts/")[1]?.split(/[?\/]/)[0];
+    return `https://www.youtube.com/embed/${videoId}`;
+  }
+
+  // 4. Shortened YouTube links (youtu.be/)
+  // This now explicitly handles formats like https://youtu.be/HAs-KBzd69A?si=...
+  if (url.includes("youtu.be/")) {
+    const parts = url.split("youtu.be/")[1];
+    // This regex split handles both query parameters (?) and trailing slashes (/)
+    const videoId = parts?.split(/[?\/]/)[0];
+    return `https://www.youtube.com/embed/${videoId}`;
+  }
+
+  // 5. Vimeo links
+  if (url.includes("vimeo.com/")) {
+    const vimeoId = url.split("vimeo.com/")[1]?.split(/[?\/]/)[0];
+    return `https://player.vimeo.com/video/${vimeoId}`;
+  }
+
+  return null;
+};
+
   const renderServiceCard = (s: Service) => {
     const durations = s.durationMinutes ?? [];
     const selectedDuration = selectedDurations[s.id] ?? durations[0];
@@ -58,6 +98,8 @@ export default function Services() {
     // Logic to find the price corresponding to the selected duration's index
     const durationIndex = durations.indexOf(selectedDuration);
     const displayPrice = s.prices?.[durationIndex] ?? s.prices?.[0] ?? 0;
+
+
 
     return (
       <div
@@ -95,7 +137,7 @@ export default function Services() {
           <div className="space-y-6">
             <div>
               <h3 className="text-4xl font-semibold text-black">{s.title}</h3>
-              <p className="text-gray-400 text-sm mt-1">{s.slug}</p>
+              {/* <p className="text-gray-400 text-sm mt-1">{s.slug}</p> */}
             </div>
 
             <p className="text-gray-600 leading-relaxed text-base">
@@ -186,7 +228,7 @@ export default function Services() {
           </button>
           <div className="w-full max-w-4xl aspect-video bg-black rounded-xl overflow-hidden">
             <iframe
-              src={activeVideo.includes('v=') ? activeVideo.replace("watch?v=", "embed/") : activeVideo}
+              src={getEmbedUrl(activeVideo)!}
               className="w-full h-full"
               allow="autoplay; encrypted-media"
               allowFullScreen

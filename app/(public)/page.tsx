@@ -513,7 +513,7 @@ export default function Home() {
             <a href="/services">Our Services</a>
           </div>
 
-          <div ref={el2C2Ref} className="flex  items-center mt-20 md:mt-0 justify-center flex-wrap gap-6 sm:gap-10 md:gap-12 w-full max-w-[1080px] mx-auto h-screen px-4">
+          <div ref={el2C2Ref} className="flex  items-center mt-20 md:mt-0 justify-center flex-wrap gap-6 sm:gap-10 md:gap-12 w-full max-w-[1080px] mx-auto h-[150vh] md:h-screen  px-4">
             {services.map((s, i) => (
               <div className="bg-[#F9F9F9] z-10 relative  p-4 w-full sm:w-[calc(50%-12px)] md:w-[312px] h-fit flex flex-col items-start" key={s.id ?? i}>
                 <img

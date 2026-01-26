@@ -125,7 +125,7 @@ body {
   color: var(--foreground);
   font-family: 'Poppins', system-ui, sans-serif;
 
-  /* overflow-x: hidden; */
+  overflow-x: hidden;
 }
 
 .dark {

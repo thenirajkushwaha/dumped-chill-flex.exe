@@ -36,41 +36,45 @@ export default function TestimonialsPage() {
     fetchTestimonials();
   }, []);
 
-  // Helper to check if URL is embeddable
-  const getEmbedUrl = (url: string | null) => {
-    if (!url) return null;
-  
-    // 1. If it's already an embed link (YouTube or Vimeo), return it as is
-    if (url.includes("youtube.com/embed/") || url.includes("player.vimeo.com/video/")) {
-      return url;
-    }
-  
-    // 2. Standard YouTube links (handle watch?v=)
-    if (url.includes("youtube.com/watch?v=")) {
-      // We split to ensure we only get the ID and exclude extra params like &t= or &feature=
-      const videoId = url.split("v=")[1]?.split("&")[0];
-      return `https://www.youtube.com/embed/${videoId}`;
-    }
-  
-    // 3. YouTube Shorts links
-    if (url.includes("youtube.com/shorts/")) {
-      return url.replace("shorts/", "embed/");
-    }
-  
-    // 4. Shortened YouTube links (youtu.be/)
-    if (url.includes("youtu.be/")) {
-      const videoId = url.split("youtu.be/")[1]?.split("?")[0];
-      return `https://www.youtube.com/embed/${videoId}`;
-    }
-  
-    // 5. Vimeo links
-    if (url.includes("vimeo.com/")) {
-      const vimeoId = url.split("vimeo.com/")[1]?.split("?")[0];
-      return `https://player.vimeo.com/video/${vimeoId}`;
-    }
-  
-    return null;
-  };
+// Helper to check if URL is embeddable
+const getEmbedUrl = (url: string | null) => {
+  if (!url) return null;
+
+  // 1. If it's already an embed link (YouTube or Vimeo), return it as is
+  if (url.includes("youtube.com/embed/") || url.includes("player.vimeo.com/video/")) {
+    return url;
+  }
+
+  // 2. Standard YouTube links (handle watch?v=)
+  if (url.includes("youtube.com/watch?v=")) {
+    const videoId = url.split("v=")[1]?.split("&")[0];
+    return `https://www.youtube.com/embed/${videoId}`;
+  }
+
+  // 3. YouTube Shorts links
+  if (url.includes("youtube.com/shorts/")) {
+    // Splits at shorts/ and then ensures no trailing slashes or params are included
+    const videoId = url.split("shorts/")[1]?.split(/[?\/]/)[0];
+    return `https://www.youtube.com/embed/${videoId}`;
+  }
+
+  // 4. Shortened YouTube links (youtu.be/)
+  // This now explicitly handles formats like https://youtu.be/HAs-KBzd69A?si=...
+  if (url.includes("youtu.be/")) {
+    const parts = url.split("youtu.be/")[1];
+    // This regex split handles both query parameters (?) and trailing slashes (/)
+    const videoId = parts?.split(/[?\/]/)[0];
+    return `https://www.youtube.com/embed/${videoId}`;
+  }
+
+  // 5. Vimeo links
+  if (url.includes("vimeo.com/")) {
+    const vimeoId = url.split("vimeo.com/")[1]?.split(/[?\/]/)[0];
+    return `https://player.vimeo.com/video/${vimeoId}`;
+  }
+
+  return null;
+};
 
   return (
     <>
