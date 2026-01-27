@@ -61,6 +61,7 @@ const loadRazorpay = () => {
 function ServiceStep({ onSelect }: { onSelect: (data: { service: Service; duration: number; price: number }) => void }) {
   const [services, setServices] = useState<Service[]>([]);
   const [selectedDurations, setSelectedDurations] = useState<Record<string, number>>({});
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     supabase.from("services").select("*").eq("is_active", true).then(({ data }) => {
@@ -69,9 +70,36 @@ function ServiceStep({ onSelect }: { onSelect: (data: { service: Service; durati
         durationMinutes: s.duration_minutes ?? [],
         prices: s.prices ?? [] 
       })) ?? [];
+      
       setServices(normalized);
+
+      // --- AUTO-SELECT LOGIC ---
+      const urlServiceId = searchParams.get("serviceId");
+      const urlDuration = searchParams.get("duration");
+
+      if (urlServiceId && normalized.length > 0) {
+        const targetService = normalized.find(s => s.id === urlServiceId);
+        
+        if (targetService) {
+          // Convert URL duration to number, fallback to first available duration
+          const durationToSet = urlDuration ? parseInt(urlDuration) : targetService.durationMinutes[0];
+          const durationIndex = targetService.durationMinutes.indexOf(durationToSet);
+          
+          // Verify duration exists for this service
+          if (durationIndex !== -1) {
+            const currentPrice = targetService.prices[durationIndex] ?? targetService.prices[0] ?? 0;
+            
+            // Execute selection automatically
+            onSelect({ 
+              service: targetService, 
+              duration: durationToSet, 
+              price: currentPrice 
+            });
+          }
+        }
+      }
     });
-  }, []);
+  }, [searchParams, onSelect]);
 
   return (
     <div className="space-y-12">
@@ -314,14 +342,15 @@ function DetailsStep({ selection, date, time, form, setForm, onBack, onSuccess, 
     }
 
     const calculatedFinal = price - currentDiscount;
-
     const bookingPayload = { 
       service, 
       date: formatLocalDate(date), 
       slotId: time.slotId, 
+      time, // ADDED THIS: Passes the whole time object { slotId, label }
       duration, 
       couponCode: coupon, 
       discountAmount: currentDiscount, 
+      final_amount: calculatedFinal, // Match DB naming
       finalAmount: calculatedFinal, 
       form 
     };

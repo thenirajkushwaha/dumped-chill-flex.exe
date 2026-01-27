@@ -23,7 +23,7 @@ export async function POST(req: Request) {
       couponCode,
       discountAmount,
       finalAmount,
-      location, // Destructured location from body
+      time, // Extract time object containing the label
       form: { name, phone, email, payment },
       paymentDetails,
     } = body;
@@ -31,54 +31,60 @@ export async function POST(req: Request) {
     /* ---------- VALIDATION ---------- */
     if (
       !service?.id ||
-      !service?.title ||
       !date ||
       !slotId ||
-      !duration ||
+      !time?.label ||
       !name ||
       !phone ||
       !email ||
       !payment ||
       finalAmount == null
     ) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+
+    // Parse the label "HH:MM - HH:MM" into separate strings for the DB
+    const [startTime, endTime] = time.label.split(" - ").map((t: string) => `${t}:00`);
+
+
+    // FIX: Generate the current timestamp in ISO format with the Kolkata offset
+    const now = new Date();
+    const kolkataOffset = 5.5 * 60 * 60 * 1000;
+    const created_at_ist = new Date(now.getTime() + kolkataOffset).toISOString();
 
     const supabase = await createSupabaseServer();
 
     /* ---------- STORE BOOKING ---------- */
     const { data: booking, error: dbError } = await supabase
-      .from("bookings")
-      .insert({
-        service_id: service.id,
-        service_title: service.title,
-        slot_id: slotId,
-        duration_minutes: duration,
-        booking_date: date,
-        customer_name: name,
-        customer_phone: phone,
-        customer_email: email,
-        payment_method: payment,
-        coupon_code: couponCode ?? null,
-        discount_amount: discountAmount ?? 0,
-        final_amount: finalAmount,
-        amount: finalAmount, 
-        status: payment === "QR" ? "confirmed" : "pending",
-      })
-      .select()
-      .single();
+    .from("bookings")
+    .insert({
+      service_id: service.id,
+      service_title: service.title,
+      slot_id: slotId,
+      duration_minutes: duration,
+      booking_date: date,
+      customer_name: name,
+      customer_phone: phone,
+      customer_email: email,
+      payment_method: payment,
+      coupon_code: couponCode ?? null,
+      discount_amount: discountAmount ?? 0,
+      final_amount: finalAmount,
+      amount: finalAmount, 
+      slot_start_time: startTime,
+      slot_end_time: endTime,
+      status: payment === "QR" ? "confirmed" : "pending",
+      // Overriding the default UTC timestamp with IST
+      created_at: created_at_ist 
+    })
+    .select()
+    .single();
 
-    if (dbError) {
-      console.error("DB ERROR:", dbError);
-      throw dbError;
-    }
+    if (dbError) throw dbError;
 
     /* ---------- STORE PAYMENT LOG ---------- */
     if (payment === "QR" && paymentDetails && booking) {
-      const { error: paymentError } = await supabase.from("payments").insert({
+      await supabase.from("payments").insert({
         booking_id: booking.id,
         razorpay_payment_id: paymentDetails.razorpay_payment_id,
         razorpay_order_id: paymentDetails.razorpay_order_id ?? null,
@@ -86,12 +92,17 @@ export async function POST(req: Request) {
         amount: finalAmount,
         status: "captured",
       });
-
-      if (paymentError) console.error("PAYMENT LOG ERROR:", paymentError);
     }
 
-    /* ---------- SEND CONFIRMATION EMAIL VIA NODEMAILER ---------- */
+    /* ---------- SEND CONFIRMATION EMAIL ---------- */
     try {
+      // Force Kolkata Timezone for "Booked on"
+      const bookedAtIST = new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        dateStyle: 'full',
+        timeStyle: 'medium'
+      }).format(new Date());
+
       await transporter.sendMail({
         from: `"Chill Thrive Bookings" <${process.env.GMAIL_USER}>`,
         to: email,
@@ -99,9 +110,8 @@ export async function POST(req: Request) {
         html: `
           <div style="background-color: #F9F9F9; padding: 5px 2.5px; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
             <div style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 32px; overflow: hidden; border: 1px solid #E5E7EB;">
-              
               <div style="padding: 40px 40px 20px 40px; text-align: center;">
-                <h1 style="margin: 0; font-size: 32px; font-weight: 600; tracking: -0.02em; color: #000000;">
+                <h1 style="margin: 0; font-size: 32px; font-weight: 600; color: #000000;">
                   <span style="color: #289BD0;">Chill</span> Thrive
                 </h1>
                 <p style="color: #9CA3AF; font-size: 16px; margin-top: 8px; font-weight: 300;">Recovery Meets Resilience</p>
@@ -116,16 +126,40 @@ export async function POST(req: Request) {
                 <div style="background-color: #F9F9F9; border-radius: 24px; padding: 24px;">
                   <table style="width: 100%; border-collapse: collapse;">
                     <tr>
-                      <td style="padding: 10px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">Date</td>
-                      <td style="padding: 10px 0; color: #111827; font-size: 15px; font-weight: 600; text-align: right;">${date}</td>
+                      <td style="padding: 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">Customer</td>
+                      <td style="padding: 8px 0; color: #111827; font-size: 14px; font-weight: 600; text-align: right;">${name}</td>
                     </tr>
                     <tr>
-                      <td style="padding: 10px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">Duration</td>
-                      <td style="padding: 10px 0; color: #111827; font-size: 15px; font-weight: 600; text-align: right;">${duration} Minutes</td>
+                      <td style="padding: 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">Phone</td>
+                      <td style="padding: 8px 0; color: #111827; font-size: 14px; font-weight: 600; text-align: right;">${phone}</td>
                     </tr>
                     <tr>
-                      <td style="padding: 10px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">Payment</td>
-                      <td style="padding: 10px 0; color: #111827; font-size: 15px; font-weight: 600; text-align: right;">${payment === "QR" ? "Online Pre-paid" : "Pay at Venue"}</td>
+                      <td style="padding: 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">Service</td>
+                      <td style="padding: 8px 0; color: #111827; font-size: 14px; font-weight: 600; text-align: right;">${service.title}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">Date</td>
+                      <td style="padding: 8px 0; color: #111827; font-size: 14px; font-weight: 600; text-align: right;">${date}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">Time Slot</td>
+                      <td style="padding: 8px 0; color: #111827; font-size: 14px; font-weight: 600; text-align: right;">${time.label} IST</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">Duration</td>
+                      <td style="padding: 8px 0; color: #111827; font-size: 14px; font-weight: 600; text-align: right;">${duration} Minutes</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">Payment</td>
+                      <td style="padding: 8px 0; color: #111827; font-size: 14px; font-weight: 600; text-align: right;">${payment === "QR" ? "Online Pre-paid" : "Pay at Venue"}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">Coupon</td>
+                      <td style="padding: 8px 0; color: #111827; font-size: 14px; font-weight: 600; text-align: right;">${couponCode || 'None'}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;">Discount</td>
+                      <td style="padding: 8px 0; color: #ef4444; font-size: 14px; font-weight: 600; text-align: right;">- ₹${discountAmount}</td>
                     </tr>
                     <tr style="border-top: 1px solid #E5E7EB;">
                       <td style="padding: 20px 0 0 0; color: #111827; font-size: 16px; font-weight: 600;">Total Amount</td>
@@ -135,20 +169,21 @@ export async function POST(req: Request) {
                 </div>
 
                 <div style="margin-top: 32px; text-align: center;">
-                  <a href="https://maps.app.goo.gl/ZCg2QDuBpDRXRrDdA" 
+                  <a href="http://maps.google.com" 
                      style="display: inline-block; background-color: #289BD0; color: #ffffff; padding: 16px 32px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase;">
                     Get Directions →
                   </a>
                 </div>
 
                 <p style="color: #9CA3AF; font-size: 13px; line-height: 1.6; text-align: center; margin-top: 40px;">
-                  Please arrive 10 minutes early. If you need to reschedule, reply to this email or contact us at ${process.env.GMAIL_USER}.
+                  Please arrive 10 minutes early. Booked on: ${bookedAtIST}<br>
+                  If you need to reschedule, reply to this email or contact us at ${process.env.GMAIL_USER}.
                 </p>
               </div>
 
               <div style="background-color: #F9F9F9; padding: 24px; text-align: center; border-top: 1px solid #E5E7EB;">
                 <p style="color: #9CA3AF; font-size: 11px; margin: 0; text-transform: uppercase; letter-spacing: 0.1em;">
-                  &copy; ${new Date().getFullYear()} Chill Thrive. Verified Member Recovery.
+                  © ${new Date().getFullYear()} Chill Thrive. Verified Member Recovery.
                 </p>
               </div>
             </div>
@@ -161,10 +196,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, bookingId: booking.id });
   } catch (err) {
-    console.error("BOOKING ERROR:", err);
-    return NextResponse.json(
-      { error: "Failed to create booking" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to create booking" }, { status: 500 });
   }
 }

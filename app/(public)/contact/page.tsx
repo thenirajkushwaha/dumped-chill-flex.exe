@@ -91,7 +91,8 @@ const handleSubmit = async (e: React.FormEvent) => {
                 </div>
                 <div>
                   <p className="text-sm font-bold uppercase tracking-widest text-gray-400">Email</p>
-                  <p className="text-xl font-medium">chillthrivegwoc@gmail.com</p>
+                  <p className="text-xl font-medium hidden md:block">chillthrivegwoc@gmail.com</p>
+                  <p className="text-xl font-medium  md:hidden">chillthrivegwoc <br /> @gmail.com</p>
                 </div>
               </div>
 
