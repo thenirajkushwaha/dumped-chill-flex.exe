@@ -50,20 +50,20 @@ export default function AwarenessPage() {
         { y: 0, opacity: 1, duration: 1, ease: "power4.out", stagger: 0.2 }
       );
 
-      const sections = gsap.utils.toArray(".awareness-section");
-      sections.forEach((section: any) => {
-        const internalGrid = section.querySelector(".section-grid");
-        gsap.from(internalGrid, {
-          y: 60,
-          opacity: 0,
-          duration: 1.2,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: internalGrid,
-            start: "top 90%",
-          }
-        });
-      });
+      // const sections = gsap.utils.toArray(".awareness-section");
+      // sections.forEach((section: any) => {
+      //   const internalGrid = section.querySelector(".section-grid");
+      //   gsap.from(internalGrid, {
+      //     y: 60,
+      //     opacity: 0,
+      //     duration: 1.2,
+      //     ease: "power3.out",
+      //     scrollTrigger: {
+      //       trigger: internalGrid,
+      //       start: "top 90%",
+      //     }
+      //   });
+      // });
     }, containerRef);
 
     return () => ctx.revert();
@@ -76,7 +76,7 @@ export default function AwarenessPage() {
       <main ref={containerRef} className="bg-white font-sans text-black selection:bg-[#289BD0] selection:text-white">
         
         {/* HERO SECTION */}
-        <section className="h-screen flex flex-col items-center justify-center relative overflow-hidden px-6">
+        <section id="hero" className="h-screen flex flex-col items-center justify-center relative overflow-hidden px-6">
           <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none">
             <h1 className="text-[30vw] font-black tracking-tighter">COLD</h1>
           </div>
@@ -93,8 +93,6 @@ export default function AwarenessPage() {
           </div>
           
           <div className="hero-content absolute bottom-12 flex flex-col items-center gap-4">
-            {/* <span className="text-[10px] uppercase tracking-[0.5em] font-black text-[#289BD0]">Begin Mastery</span> */}
-            {/* <div className="w-[2px] h-16 bg-gradient-to-b from-[#289BD0] to-transparent" /> */}
           </div>
         </section>
 
@@ -108,13 +106,13 @@ export default function AwarenessPage() {
               
               {/* Media Card */}
               <div className={`relative ${idx % 2 !== 0 ? 'lg:order-2' : ''}`}>
-                <div className="w-full aspect-[4/5] rounded-[48px] overflow-hidden bg-[#F9F9F9] shadow-2xl shadow-blue-100/20 group">
+                <div className="w-full aspect-[4/5] rounded-[48px] overflow-hidden bg-[#F9F9F9] group">
                   <img
                     src={section.media_url || "/image/blankimage.png"}
                     alt={section.title}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    className="w-full h-full object-cover transition-transform duration-700"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-[48px] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 </div>
                 {/* Floating Index */}
                 <div className="absolute -top-4 -right-4 w-16 h-16 md:w-20 md:h-20 bg-black rounded-2xl md:rounded-3xl flex items-center justify-center text-white text-2xl md:text-3xl font-black">
