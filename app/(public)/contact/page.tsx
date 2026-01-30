@@ -72,7 +72,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         {/* LEFT COLUMN: DETAILS & MAP */}
         <div className="space-y-8">
           <div className="bg-[#F9F9F9] p-10 rounded-[40px] space-y-8">
-            <h2 className="text-3xl font-semibold mb-6">Studio Details</h2>
+            <h2 className="text-3xl font-semibold mb-6">Details</h2>
             
             <div className="space-y-6">
               <div className="flex items-start gap-4">
