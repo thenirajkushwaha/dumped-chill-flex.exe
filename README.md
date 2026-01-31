@@ -2,6 +2,8 @@
 
 A comprehensive Next.js application for Chill Thrive, a recovery and wellness center offering ice bath sessions, cold therapy, and community-driven wellness programs. This platform includes both a public-facing client frontend and an administrative panel for managing services, bookings, content, and operations.
 
+**Note:** For admin login contact the developer.
+
 ## 🚀 Technology Stack
 
 - **Framework**: Next.js 16.1.1 (App Router)
