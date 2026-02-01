@@ -104,8 +104,8 @@ export default function AdminBookings() {
     
     const isPast = b.booking_date < localToday;
     let matchesView = false;
-    if (viewMode === 'archive') matchesView = isPast;
-    else if (viewMode === 'cancelled') matchesView = !isPast && b.status === 'cancelled';
+    if (viewMode === 'archive') matchesView = isPast && b.status !== 'cancelled';
+    else if (viewMode === 'cancelled') matchesView = isPast && b.status === 'cancelled';
     else matchesView = !isPast && (b.status === 'pending' || b.status === 'confirmed');
 
     return matchesSearch && matchesView;
